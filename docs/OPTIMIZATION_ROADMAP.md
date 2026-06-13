@@ -259,7 +259,14 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
   Ad-block research: `w0qxe5ouj`. Quality gate: `wig3eqh4t`.
 - **Branch: `feat/ux-perf-video-audio`** (was `feat/quick-wins-batch`). Commit `4a510a9`.
 - **PR #1: https://github.com/CreatorGhost/AABrowser/pull/1** — quick wins + video sprint +
-  review hardening. Pushed as CreatorGhost. **STATUS: open, awaiting user test on head unit.**
+  review hardening. CodeRabbit's 8 findings fixed (`7e9ccd4`). Open.
+- **PR #2: https://github.com/CreatorGhost/AABrowser/pull/2** — stable-tier ad/tracker/pop-up
+  blocking, stacked on PR #1. Self-reviewed + hardened. Open, awaiting CodeRabbit.
+- **Release: v2.1-beta1** (pre-release) — signed APK `AABrowser-2.1-beta1.apk` (6.4M, R8).
+  https://github.com/CreatorGhost/AABrowser/releases/tag/v2.1-beta1
+- **Signing:** `release.keystore` (gitignored) alias `aabrowser`; creds in `local.properties`
+  (gitignored). **User must keep this keystore** to ship updates over installs (SHA-256
+  49abfe83…). versionCode 8 / versionName 2.1-beta1.
 
 ## USER DECISIONS (2026-06-13)
 - **Ad block: STABLE TIER** chosen (general web hosts + cosmetic + Facebook feed + SponsorBlock).
