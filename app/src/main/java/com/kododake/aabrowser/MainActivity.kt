@@ -1723,6 +1723,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMenuOverlay(focusAddressBar: Boolean = false) {
+        // Deterministically reset to the main menu panel. hideMenuOverlay() resets sub-panels only
+        // in its animation end-action, which is skipped if the close was interrupted by a rapid
+        // reopen — leaving the menu stuck on a stale sub-panel (Settings/Tabs/etc.).
+        binding.bookmarkManagerRoot.visibility = View.GONE
+        binding.tabManagerRoot.visibility = View.GONE
+        binding.qrCodeViewRoot.visibility = View.GONE
+        binding.checkLatestViewRoot.visibility = View.GONE
+        binding.settingsViewRoot.visibility = View.GONE
+        binding.menuScroll.visibility = View.VISIBLE
         binding.menuOverlay.visibility = View.VISIBLE
         binding.menuCard.post {
             binding.menuCard.translationY = binding.menuCard.height.toFloat()
