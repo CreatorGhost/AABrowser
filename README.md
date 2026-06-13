@@ -100,33 +100,40 @@ Every contribution makes AA Browser better!
 
 <table width="100%">
   <tr>
-    <td align="center" valign="top" width="25%">
+    <td align="center" valign="top" width="20%">
       <a href="https://github.com/kododake">
         <img src="https://github.com/kododake.png?s=100" width="60" alt="kododake"/><br />
         <sub><b>kododake</b></sub>
       </a><br />
       <sub>Project Lead</sub>
     </td>
-    <td align="center" valign="top" width="25%">
+    <td align="center" valign="top" width="20%">
       <a href="https://github.com/cmacrowther">
         <img src="https://github.com/cmacrowther.png?s=100" width="60" alt="Colin Crowther"/><br />
         <sub><b>Colin Crowther</b></sub>
       </a><br />
       <sub>Design Improvements</sub>
     </td>
-    <td align="center" valign="top" width="25%">
+    <td align="center" valign="top" width="20%">
       <a href="https://github.com/jigneshbhavani">
         <img src="https://github.com/jigneshbhavani.png?s=100" width="60" alt="jigneshbhavani"/><br />
         <sub><b>jigneshbhavani</b></sub>
       </a><br />
       <sub>Microphone Support</sub>
     </td>
-    <td align="center" valign="top" width="25%">
+    <td align="center" valign="top" width="20%">
       <a href="https://github.com/SaveEditors">
         <img src="https://github.com/SaveEditors.png?s=100" width="60" alt="SaveEditors"/><br />
         <sub><b>SaveEditors</b></sub>
       </a><br />
       <sub>Multi-tab support, Home screen</sub>
+    </td>
+    <td align="center" valign="top" width="20%">
+      <a href="https://github.com/gregorixG">
+        <img src="https://github.com/gregorixG.png?s=100" width="60" alt="gregorixG"/><br />
+        <sub><b>gregorixG</b></sub>
+      </a><br />
+      <sub>Improve desktop site user agent handling</sub>
     </td>
   </tr>
 </table>
