@@ -70,6 +70,15 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_beta_dark_pages">Beta: darken web pages</string>
     <string name="settings_beta_dark_pages_description">Uses WebView algorithmic darkening when available. Best results with dark mode enabled.</string>
+    <string name="settings_use_system_colors">Use system colors</string>
+    <string name="settings_use_system_colors_description">Match the head unit\'s Material You wallpaper colors instead of the built-in AA Browser theme. Off keeps the curated brand and AMOLED look.</string>
+    <string name="settings_analytics">Send anonymous usage stats</string>
+    <string name="settings_analytics_description">Off by default. When on, sends an anonymous app-open count to help improve AA Browser. No browsing data is collected.</string>
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_stop">Stop</string>
+    <string name="media_notification_channel">Media playback</string>
+    <string name="media_notification_channel_description">Shows playback controls and keeps audio playing in the background.</string>
     <string name="settings_display_scale">Display scale</string>
     <string name="settings_display_scale_description">Scale the browser UI and page content together. Applying a new value reloads the screen.</string>
     <string name="settings_scale_option">%1$d%%</string>
@@ -211,7 +220,4 @@
     <string name="error_generic_message">An unexpected error occurred.</string>
     <string name="error_open_download">Unable to open download. Please try again on your phone.</string>
     <string name="error_open_external">Unable to open the link externally.</string>
-    <string name="media_notification_channel_name">Media playback</string>
-    <string name="media_notification_channel_description">Controls media playback in web pages</string>
-    <string name="media_notification_content_text">Playing media in WebView</string>
 </resources>

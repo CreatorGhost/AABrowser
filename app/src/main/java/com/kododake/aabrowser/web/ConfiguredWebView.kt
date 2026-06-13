@@ -40,7 +40,9 @@ data class BrowserCallbacks(
     ) -> Unit = { _, _, _, cancel -> cancel() },
     val onEnterFullscreen: (View, WebChromeClient.CustomViewCallback) -> Unit = { _, _ -> },
     val onExitFullscreen: () -> Unit = {},
-    val onPermissionRequest: (PermissionRequest) -> Unit = { it.deny() }
+    val onPermissionRequest: (PermissionRequest) -> Unit = { it.deny() },
+    val onCreateWindowRequest: (Message) -> Boolean = { false },
+    val onCloseWindowRequest: (WebView) -> Unit = {}
 )
 
 fun configureWebView(
@@ -80,9 +82,10 @@ fun configureWebView(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = true
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                offscreenPreRaster = true
-            }
+            // offscreenPreRaster is toggled per-tab on the ACTIVE WebView only (see
+            // MainActivity.switchToTab). Forcing it on every tab raises GPU memory pressure on
+            // the large head-unit display and gives no benefit to a fullscreen video surface.
+            offscreenPreRaster = false
         }
 
         applyPageDarkening(allowDarkPages)
@@ -130,6 +133,7 @@ fun configureWebView(
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 view.evaluateJavascript(SpeechRecognitionBridge.POLYFILL_JS, null)
+                view.evaluateJavascript(MediaPlaybackBridge.INJECTION_JS, null)
                 url?.let(callbacks.onUrlChange)
             }
 
@@ -257,7 +261,18 @@ fun configureWebView(
                 isUserGesture: Boolean,
                 resultMsg: Message?
             ): Boolean {
-                return false
+                resultMsg ?: return false
+                // Only honor popups triggered by a real user gesture (e.g. tapping "Sign in with
+                // Google/Apple"). Refusing programmatic window.open() blocks popup-spam / focus-
+                // steal / lookalike-tab phishing while preserving genuine OAuth flows.
+                if (!isUserGesture) return false
+                // Route the popup to the host so it opens as a real in-app tab via WebViewTransport.
+                return callbacks.onCreateWindowRequest(resultMsg)
+            }
+
+            override fun onCloseWindow(window: WebView?) {
+                window?.let(callbacks.onCloseWindowRequest)
+                super.onCloseWindow(window)
             }
         }
 

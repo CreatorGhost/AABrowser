@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wide displays (available width >= 600dp), e.g. car head units that report a
+  smallestScreenWidthDp of 480 (an 800x480 unit) and therefore miss the sw600dp bucket.
+  w600dp has higher resource precedence than the bare `land` qualifier, so menu_max_height
+  here also corrects the landscape bucket that previously shrank the menu below portrait.
+-->
+<resources>
+    <!-- Menu Layout Dimensions -->
+    <dimen name="menu_card_corner_radius">32dp</dimen>
+    <dimen name="menu_card_elevation">12dp</dimen>
+    <dimen name="menu_padding_horizontal">32dp</dimen>
+    <dimen name="menu_padding_vertical">24dp</dimen>
+    <dimen name="menu_max_height">560dp</dimen>
+
+    <!-- Content Spacing -->
+    <dimen name="menu_section_spacing">24dp</dimen>
+    <dimen name="menu_item_spacing">20dp</dimen>
+    <dimen name="menu_small_spacing">12dp</dimen>
+
+    <!-- UI Elements -->
+    <dimen name="button_corner_radius">20dp</dimen>
+    <dimen name="card_corner_radius">20dp</dimen>
+    <dimen name="drag_handle_width">48dp</dimen>
+    <dimen name="drag_handle_height">5dp</dimen>
+
+    <!-- Button Sizes (larger touch targets for head units) -->
+    <dimen name="icon_button_size">56dp</dimen>
+    <dimen name="icon_size_small">24dp</dimen>
+    <dimen name="icon_size_medium">28dp</dimen>
+</resources>

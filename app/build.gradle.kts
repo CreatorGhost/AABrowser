@@ -106,6 +106,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.webkit)
+    implementation(libs.androidx.media)
     implementation(libs.google.material)
     implementation(libs.androidx.car.app)
     implementation(libs.zxing.core)
@@ -113,7 +114,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.google.oss.licenses)
-    implementation("com.github.woheller69:FreeDroidWarn:V1.+")
+    // Pinned to an exact tag (was V1.+) for reproducible builds / supply-chain safety.
+    implementation("com.github.woheller69:FreeDroidWarn:V1.13")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

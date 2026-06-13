@@ -158,6 +158,44 @@ object SettingsViews {
 
         val smallIconSize = context.resources.getDimensionPixelSize(R.dimen.icon_size_small)
         val onSurfaceColor = getColorFromAttr(com.google.android.material.R.attr.colorOnSurface)
+
+        fun buildSwitchRow(
+            title: String,
+            description: String,
+            initialChecked: Boolean,
+            onChange: (Boolean) -> Unit
+        ): LinearLayout {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(16), 0, 0)
+            }
+            val textCol = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginEnd = dp(12)
+                }
+            }
+            textCol.addView(TextView(context).apply {
+                text = title
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+                setTextColor(onSurfaceColor)
+            })
+            textCol.addView(TextView(context).apply {
+                text = description
+                setPadding(0, dp(4), 0, 0)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                setTextColor(getColorFromAttr(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            })
+            val switch = SwitchMaterial(context).apply {
+                isChecked = initialChecked
+                setUseMaterialThemeColors(true)
+            }
+            switch.setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
+            row.addView(textCol)
+            row.addView(switch)
+            return row
+        }
         val onSurfaceVariantColor = getColorFromAttr(com.google.android.material.R.attr.colorOnSurfaceVariant)
 
         val container = LinearLayout(context).apply {
@@ -324,6 +362,18 @@ object SettingsViews {
         betaDarkRow.addView(betaDarkText)
         betaDarkRow.addView(betaDarkSwitch)
         appearanceInner.addView(betaDarkRow)
+
+        appearanceInner.addView(
+            buildSwitchRow(
+                title = context.getString(R.string.settings_use_system_colors),
+                description = context.getString(R.string.settings_use_system_colors_description),
+                initialChecked = BrowserPreferences.shouldUseSystemColors(context)
+            ) { isChecked ->
+                if (isChecked == BrowserPreferences.shouldUseSystemColors(context)) return@buildSwitchRow
+                BrowserPreferences.setUseSystemColors(context, isChecked)
+                callbacks.onThemeChanged()
+            }
+        )
 
         appearanceCard.addView(appearanceInner)
         container.addView(appearanceCard)
@@ -926,12 +976,16 @@ object SettingsViews {
         fun generateQrBitmap(data: String, sizePx: Int): Bitmap? {
             return runCatching {
                 val matrix: BitMatrix = QRCodeWriter().encode(data, BarcodeFormat.QR_CODE, sizePx, sizePx)
-                Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888).apply {
+                val pixels = IntArray(sizePx * sizePx)
+                for (y in 0 until sizePx) {
+                    val rowOffset = y * sizePx
                     for (x in 0 until sizePx) {
-                        for (y in 0 until sizePx) {
-                            setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
-                        }
+                        pixels[rowOffset + x] = if (matrix[x, y]) Color.BLACK else Color.WHITE
                     }
+                }
+                // RGB_565 halves the bitmap memory vs ARGB_8888 — QR is opaque black/white.
+                Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.RGB_565).apply {
+                    setPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx)
                 }
             }.getOrNull()
         }
@@ -1079,6 +1133,15 @@ object SettingsViews {
         )
         siteDataInner.addView(clearSitePermissionsButton)
         siteDataInner.addView(clearCookiesButton)
+        siteDataInner.addView(
+            buildSwitchRow(
+                title = context.getString(R.string.settings_analytics),
+                description = context.getString(R.string.settings_analytics_description),
+                initialChecked = BrowserPreferences.isAnalyticsEnabled(context)
+            ) { isChecked ->
+                BrowserPreferences.setAnalyticsEnabled(context, isChecked)
+            }
+        )
         siteDataCard.addView(siteDataInner)
         container.addView(siteDataCard)
 
