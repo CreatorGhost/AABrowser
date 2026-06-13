@@ -2,9 +2,6 @@ package com.kododake.aabrowser.media
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -30,47 +27,11 @@ class MediaSessionController(
         fun onSeekTo(positionMs: Long)
     }
 
-    private val audioManager =
-        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var audioFocusRequest: AudioFocusRequest? = null
-    private var hasAudioFocus = false
-    private var wasTransientlyPaused = false
-    private var focusGrantedAt = 0L
-
-    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
-        when (change) {
-            AudioManager.AUDIOFOCUS_LOSS -> {
-                // A loss arriving almost immediately after we gained focus — or while we don't even
-                // hold focus — means focus was never really held (a car head unit where nav/
-                // Assistant contend audio). Chromium still owns the audio stream and the video is
-                // playing fine. Pausing here is the root of the "plays then immediately stops" bug,
-                // so only pause on a STABLE held loss; otherwise just drop focus, don't pause.
-                val heldMs = android.os.SystemClock.elapsedRealtime() - focusGrantedAt
-                wasTransientlyPaused = false
-                if (hasAudioFocus && heldMs >= FOCUS_STABLE_MS) callback.onPause()
-                abandonAudioFocus()
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Short interruption (e.g. a call): pause but keep focus so we can auto-resume —
-                // unless we never stably held focus, same reasoning as above.
-                val heldMs = android.os.SystemClock.elapsedRealtime() - focusGrantedAt
-                if (hasAudioFocus && heldMs >= FOCUS_STABLE_MS) {
-                    wasTransientlyPaused = true
-                    callback.onPause()
-                }
-            }
-            // The system ducks us automatically for short nav prompts; keep playing.
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> { /* no-op */ }
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                focusGrantedAt = android.os.SystemClock.elapsedRealtime()
-                // Only auto-resume if WE paused for a transient loss — not if the user paused.
-                if (wasTransientlyPaused) {
-                    wasTransientlyPaused = false
-                    callback.onPlay()
-                }
-            }
-        }
-    }
+    // NOTE: this controller deliberately does NOT request Android audio focus. The WebView's own
+    // Chromium media stack already holds audio focus for the page's HTML5 media; a competing
+    // AUDIOFOCUS_GAIN from this same app makes Chromium pause its own video (the "plays then
+    // stops" bug). We only mirror playback into a MediaSession and keep the process alive via the
+    // foreground service; Chromium owns focus, ducking, and pause-on-takeover for the media.
 
     private val session = MediaSessionCompat(context, "AABrowserMedia").apply {
         setCallback(object : MediaSessionCompat.Callback() {
@@ -84,16 +45,13 @@ class MediaSessionController(
     val sessionToken: MediaSessionCompat.Token get() = session.sessionToken
 
     fun onPlaybackStarted(positionMs: Long) {
-        // Anchor the focus-stability debounce on THIS playback episode, unconditionally — even if
-        // the focus request is denied (the normal head-unit case where nav/Assistant hold focus).
-        // Otherwise focusGrantedAt stays 0 and a later LOSS computes a huge "held" time, skipping
-        // the debounce and pausing the just-started video — the exact "plays then stops" bug.
-        focusGrantedAt = android.os.SystemClock.elapsedRealtime()
-        // Best-effort audio focus: request it so other apps duck/pause and so background
-        // continuation works — but DO NOT pause the page if it isn't granted. The video is already
-        // playing in the WebView (Chromium owns that audio stream). Genuine takeovers are still
-        // handled by the focus LOSS listener (which only pauses on a STABLE, held loss).
-        requestAudioFocus()
+        // IMPORTANT: do NOT request audio focus here. The WebView's own Chromium media stack
+        // already holds audio focus for the HTML5 <video>/<audio>. A second AUDIOFOCUS_GAIN
+        // request from the SAME app sends Chromium an AUDIOFOCUS_LOSS, and Chromium responds by
+        // PAUSING its own video — reproduced as "plays for a few seconds then stops" on a plain
+        // phone/emulator. We just mirror playback state into a MediaSession (for transport
+        // controls/metadata) and keep the process alive with the foreground service; Chromium
+        // owns audio focus, ducking, and pause-on-takeover for the page's media.
         session.isActive = true
         setState(PlaybackStateCompat.STATE_PLAYING, positionMs)
         MediaPlaybackService.start(context, sessionToken)
@@ -105,19 +63,14 @@ class MediaSessionController(
     }
 
     fun onPlaybackPaused(positionMs: Long) {
-        // An explicit pause clears the transient flag so a later focus GAIN won't auto-resume
-        // a video the user intentionally stopped.
-        wasTransientlyPaused = false
         setState(PlaybackStateCompat.STATE_PAUSED, positionMs)
         // Session stays active and the (paused) notification stays so the user can resume.
     }
 
     fun onPlaybackStopped() {
         // Setting STOPPED is observed by MediaPlaybackService, which then tears itself down.
-        wasTransientlyPaused = false
         setState(PlaybackStateCompat.STATE_STOPPED, 0)
         session.isActive = false
-        abandonAudioFocus()
     }
 
     private var lastTitle: String? = null
@@ -163,40 +116,9 @@ class MediaSessionController(
         )
     }
 
-    private fun requestAudioFocus(): Boolean {
-        if (hasAudioFocus) return true
-        val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
-            .build()
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setAudioAttributes(attrs)
-            .setOnAudioFocusChangeListener(focusListener)
-            .setWillPauseWhenDucked(false)
-            .build()
-        audioFocusRequest = request
-        hasAudioFocus =
-            audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (hasAudioFocus) focusGrantedAt = android.os.SystemClock.elapsedRealtime()
-        return hasAudioFocus
-    }
-
-    private fun abandonAudioFocus() {
-        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-        audioFocusRequest = null
-        hasAudioFocus = false
-    }
-
     fun release() {
         // Releasing the session fires onSessionDestroyed on the service, which stops itself.
-        abandonAudioFocus()
         session.isActive = false
         session.release()
-    }
-
-    private companion object {
-        // A focus loss within this window of gaining focus is treated as spurious (contended
-        // car audio) and does NOT pause the page — Chromium still owns the audio stream.
-        const val FOCUS_STABLE_MS = 1500L
     }
 }
