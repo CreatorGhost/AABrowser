@@ -13,6 +13,13 @@ Google echo. Alternates if you want a different feel:
 
 *(Pick one; I'll verify trademark/Play/domain before locking. Everything below is name-agnostic.)*
 
+## LOCKED DECISIONS (2026-06-14)
+- **Name: Driftway** (verify trademark/domain before public relaunch).
+- **Repo: rename existing** `CreatorGhost/AABrowser` → `Driftway` (GitHub redirects old links). Do the actual repo rename + applicationId/package/label/icon change as the rebrand step so current beta links aren't disrupted mid-flight. Keep GPLv3 + original attribution.
+- **Control bar: hidden + swipe-up** — bar hidden by default; a FIXED always-visible bottom-edge handle + swipe-up (or tap handle) reveals Back·Home·Tabs·Menu. The trigger is always visible (no hunt); the bar itself stays out of the way.
+- **Accent: electric blue** (vivid/saturated) on true-black AMOLED.
+- Build via PRs; **every PR waits for CodeRabbit before merge**.
+
 ## Redesign table (Today → New)
 
 | # | Area | Today (the old app) | New (V3) | Why — in-car rationale | Effort |
