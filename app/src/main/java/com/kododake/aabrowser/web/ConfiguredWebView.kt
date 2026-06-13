@@ -23,7 +23,10 @@ import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.R
+import com.kododake.aabrowser.adblock.AdBlockManager
+import com.kododake.aabrowser.adblock.SponsorBlock
 import com.kododake.aabrowser.model.UserAgentProfile
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class BrowserCallbacks(
     val onUrlChange: (String) -> Unit = {},
@@ -96,9 +99,33 @@ fun configureWebView(
             it.setAcceptThirdPartyCookies(this, true)
         }
 
+        // Cosmetic ad-hiding (collapse leftover ad gaps), the Facebook in-feed hider, and
+        // SponsorBlock are injected per page load in onPageStarted (NOT registered once at
+        // construction) so the live ad-block / SponsorBlock toggles and the per-site allowlist
+        // take effect on the next page load instead of being frozen at WebView creation.
+        //
+        // adBlockDisabledForPage is set on the UI thread (onPageStarted) when the current page's
+        // host is on the ad-block allowlist; read on the intercept thread to skip blocking for
+        // that page. AtomicBoolean because shouldInterceptRequest runs off the UI thread.
+        val adBlockDisabledForPage = AtomicBoolean(false)
+
         //setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                // Block ad/tracker SUBRESOURCES only — never the main-frame navigation. Runs off
+                // the UI thread; AdBlockManager lookups are O(1) and thread-safe.
+                if (request.isForMainFrame || adBlockDisabledForPage.get()) return null
+                return if (AdBlockManager.shouldBlock(request.url?.host)) {
+                    AdBlockManager.blockedResponse()
+                } else {
+                    null
+                }
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = false)) return true
@@ -119,6 +146,27 @@ fun configureWebView(
                 val stringUrl = url ?: return
                 val uri = Uri.parse(stringUrl)
                 val scheme = uri.scheme?.lowercase()
+
+                // Refresh the per-page ad-block allowlist flag on the UI thread for the
+                // intercept thread to read.
+                val allowlisted = AdBlockManager.isHostAllowlisted(view.context, uri.host)
+                adBlockDisabledForPage.set(allowlisted)
+
+                // Inject cosmetic hiding (and the Facebook in-feed hider) when ad-blocking is on
+                // for this page; gated live so the toggle/allowlist take effect on next load.
+                val host = uri.host?.lowercase().orEmpty()
+                if (AdBlockManager.enabled && !allowlisted) {
+                    view.evaluateJavascript(AdBlockManager.cosmeticCssJs(), null)
+                    if (isHostOrSubdomainOf(host, "facebook.com")) {
+                        view.evaluateJavascript(AdBlockManager.FACEBOOK_COSMETIC_JS, null)
+                    }
+                }
+                // SponsorBlock is independently opt-in (it contacts a third-party server).
+                if (isHostOrSubdomainOf(host, "youtube.com") &&
+                    com.kododake.aabrowser.data.BrowserPreferences.isSponsorBlockEnabled(view.context)
+                ) {
+                    view.evaluateJavascript(SponsorBlock.JS, null)
+                }
 
                 if (scheme == "http") {
                     val allowedOnce = getTag(R.id.webview_allow_once_uri_tag) as? String
@@ -282,6 +330,13 @@ fun configureWebView(
         })
     }
 }
+
+/**
+ * True if [host] equals [domain] or is a true subdomain of it (dot-boundary match), so that
+ * "evil-facebook.com" / "notyoutube.com" do NOT match — only "facebook.com" / "m.youtube.com" do.
+ */
+private fun isHostOrSubdomainOf(host: String, domain: String): Boolean =
+    host == domain || host.endsWith(".$domain")
 
 private fun handleCleartextIfNeeded(view: WebView, uri: Uri?, callbacks: BrowserCallbacks, onPageStart: Boolean = false): Boolean {
     uri ?: return false
