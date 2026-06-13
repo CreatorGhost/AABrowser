@@ -26,6 +26,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -49,6 +50,8 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.data.SiteIconCache
+import com.kododake.aabrowser.media.MediaSessionController
+import com.kododake.aabrowser.web.MediaPlaybackBridge
 import com.kododake.aabrowser.databinding.ActivityMainBinding
 import com.kododake.aabrowser.model.QuickActionButtonMode
 import com.kododake.aabrowser.model.QuickActionButtonPosition
@@ -74,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         val id: Long,
         val webView: android.webkit.WebView,
         val speechBridge: com.kododake.aabrowser.web.SpeechRecognitionBridge,
+        val mediaBridge: MediaPlaybackBridge,
         var currentUrl: String = "",
         var currentTitle: String = ""
     )
@@ -124,6 +128,16 @@ class MainActivity : AppCompatActivity() {
     private var loadedStartPageBackgroundUri: String? = null
     private var loadedStartPageBackgroundBitmap: Bitmap? = null
     private var cachedStartPageGradientSignature: Int = 0
+    private var cachedSponsorQr: Bitmap? = null
+    private var mediaController: MediaSessionController? = null
+    private var mediaPlayingTabId: Long? = null
+    private var isMediaPlaying: Boolean = false
+    // True from first "playing" until "stopped" (covers paused-but-resumable). Used to keep the
+    // media tab's WebView alive across background/tab-switch so it can resume from the notification.
+    private var hasActiveMediaSession: Boolean = false
+    private var lastMediaTitle: String? = null
+    private var lastMediaArtist: String? = null
+    private var lastMediaDurationMs: Long = 0L
 
     override fun attachBaseContext(newBase: Context?) {
         if (newBase == null) {
@@ -134,14 +148,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivityIfAvailable(this)
+        // Only override the curated brand/AMOLED palette with Material You wallpaper colors
+        // when the user has explicitly opted in; otherwise the designed theme ships as-is.
+        if (BrowserPreferences.shouldUseSystemColors(this)) {
+            DynamicColors.applyToActivityIfAvailable(this)
+        }
         AppCompatDelegate.setDefaultNightMode(BrowserPreferences.getThemeMode(this).nightMode)
         super.onCreate(savedInstanceState)
         shouldForceSessionRestore = savedInstanceState != null
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemBarAppearance()
+        setupMediaSession()
 
-        umamiTracker.trackEvent("app_open")
+        if (BrowserPreferences.isAnalyticsEnabled(this)) {
+            umamiTracker.trackEvent("app_open")
+        }
 
         val disp = this.display
         val best = disp?.supportedModes?.maxWithOrNull(compareBy({ it.refreshRate }, { it.physicalWidth.toLong() * it.physicalHeight }))
@@ -166,6 +188,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView?.onResume()
+        applySystemBarAppearance()
         applyMenuHeaderColors()
         refreshHomePageMode()
         refreshBookmarks()
@@ -177,9 +200,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        exitFullscreen()
-        webView?.onPause()
+        // WebView flushes its cookie jar lazily; an abrupt projection-host process kill can
+        // otherwise lose the most recent login cookies. Flush now so sessions persist.
+        CookieManager.getInstance().flush()
+        // On a transient interruption (heads-up call, permission dialog, system overlay,
+        // multi-window) onStop does NOT fire, so without this the WebView keeps decoding video
+        // and running JS timers — wasting CPU/battery. Skip only when media should keep playing.
+        if (!hasActiveMediaSession) {
+            exitFullscreen()
+            webView?.onPause()
+        }
         super.onPause()
+    }
+
+    override fun onStop() {
+        // Always tear down fullscreen on true backgrounding so the custom-view + system-bar state
+        // can't be left stale. Keep the WebView itself running only when there's an active media
+        // session, so audio continues in the background / while driving (the foreground service
+        // keeps the process alive); the video surface is gone but audio — the legitimate part — survives.
+        exitFullscreen()
+        if (!hasActiveMediaSession) {
+            webView?.onPause()
+        }
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -189,6 +232,7 @@ class MainActivity : AppCompatActivity() {
         loadedStartPageBackgroundBitmap?.recycle()
         loadedStartPageBackgroundBitmap = null
         loadedStartPageBackgroundUri = null
+        cachedSponsorQr = null
         browserTabs.forEach { tab ->
             tab.speechBridge.destroy()
             tab.webView.releaseCompletely()
@@ -196,6 +240,11 @@ class MainActivity : AppCompatActivity() {
         binding.webViewContainer.removeAllViews()
         browserTabs.clear()
         webView = null
+        // Null first so the session's transport callback (which captures this Activity via
+        // evalOnMediaTab) can't fire against a half-destroyed Activity during release().
+        val mc = mediaController
+        mediaController = null
+        mc?.release()
         super.onDestroy()
     }
 
@@ -613,10 +662,14 @@ class MainActivity : AppCompatActivity() {
         val speechBridge = com.kododake.aabrowser.web.SpeechRecognitionBridge(tabView) { pageUrl ->
             requestSpeechRecognitionMicrophoneAccess(tab.id, pageUrl)
         }
+        val mediaBridge = MediaPlaybackBridge { state ->
+            runOnUiThread { handleMediaState(tab.id, state) }
+        }
         tab = BrowserTab(
             id = nextTabId++,
             webView = tabView,
             speechBridge = speechBridge,
+            mediaBridge = mediaBridge,
             currentUrl = initialUrl.orEmpty(),
             currentTitle = initialTitle
         )
@@ -653,6 +706,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }, "Android")
+
+        tabView.addJavascriptInterface(mediaBridge, MediaPlaybackBridge.INTERFACE_NAME)
 
         tabView.setOnTouchListener { _, _ ->
             showMenuButtonTemporarily()
@@ -752,8 +807,28 @@ class MainActivity : AppCompatActivity() {
             },
             onPermissionRequest = { request ->
                 runOnUiThread { handleWebPermissionRequest(request) }
+            },
+            onCreateWindowRequest = { resultMsg -> openPopupWindow(resultMsg) },
+            onCloseWindowRequest = { closedWebView ->
+                runOnUiThread {
+                    browserTabs.firstOrNull { it.webView === closedWebView }?.let { closeTab(it.id) }
+                }
             }
         )
+    }
+
+    /**
+     * Hosts a popup window (e.g. an OAuth "Sign in with Google/Apple" flow) as a real in-app
+     * tab via [android.webkit.WebView.WebViewTransport]. Using a genuine new WebView preserves
+     * the window.opener relationship those flows rely on to post the result back.
+     */
+    private fun openPopupWindow(resultMsg: android.os.Message): Boolean {
+        val transport = resultMsg.obj as? android.webkit.WebView.WebViewTransport ?: return false
+        val popupTab = createBrowserTab(initialUrl = null, initialTitle = "", activate = true)
+            ?: return false
+        transport.webView = popupTab.webView
+        resultMsg.sendToTarget()
+        return true
     }
 
     private fun showCleartextNavigationDialog(
@@ -789,14 +864,22 @@ class MainActivity : AppCompatActivity() {
     private fun switchToTab(tabId: Long) {
         val selectedTab = browserTabs.firstOrNull { it.id == tabId } ?: return
         if (webView !== selectedTab.webView) {
-            webView?.onPause()
+            // Don't pause a tab with an active media session (playing OR paused-but-resumable) —
+            // let it keep its audio/resumability when the user opens/switches to another tab.
+            val previousTab = browserTabs.firstOrNull { it.webView === webView }
+            if (!(hasActiveMediaSession && previousTab?.id == mediaPlayingTabId)) {
+                webView?.onPause()
+            }
         }
 
         activeTabId = selectedTab.id
         webView = selectedTab.webView
 
         browserTabs.forEach { tab ->
-            tab.webView.visibility = if (tab.id == selectedTab.id) View.VISIBLE else View.GONE
+            val isActive = tab.id == selectedTab.id
+            tab.webView.visibility = if (isActive) View.VISIBLE else View.GONE
+            // Pre-raster only the visible tab; background tabs don't need the extra GPU memory.
+            tab.webView.settings.offscreenPreRaster = isActive
         }
         selectedTab.webView.onResume()
 
@@ -835,6 +918,16 @@ class MainActivity : AppCompatActivity() {
         val removedTab = browserTabs.removeAt(tabIndex)
         if (pendingSpeechBridgeTabId == removedTab.id) {
             pendingSpeechBridgeTabId = null
+        }
+        if (mediaPlayingTabId == removedTab.id) {
+            // The tab that was playing is gone — tear down the media session/notification.
+            mediaPlayingTabId = null
+            isMediaPlaying = false
+            hasActiveMediaSession = false
+            lastMediaTitle = null
+            lastMediaArtist = null
+            lastMediaDurationMs = 0L
+            mediaController?.onPlaybackStopped()
         }
         removedTab.speechBridge.destroy()
         binding.webViewContainer.removeView(removedTab.webView)
@@ -1658,12 +1751,20 @@ class MainActivity : AppCompatActivity() {
         webView?.visibility = View.INVISIBLE
         binding.fullscreenContainer.apply {
             visibility = View.VISIBLE
+            // Opaque black backing so the player never shows page content bleeding through.
+            setBackgroundColor(Color.BLACK)
             removeAllViews()
             addView(view, FrameLayout.LayoutParams(-1, -1))
             bringToFront()
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        WindowInsetsControllerCompat(window, binding.fullscreenContainer).hide(WindowInsetsCompat.Type.systemBars())
+        // Use one consistent inset-controller target (root) for enter/exit, and let a stray
+        // touch only reveal the bars transiently (swipe) instead of permanently breaking immersion.
+        WindowInsetsControllerCompat(window, binding.root).apply {
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     private fun exitFullscreen(fromWebChrome: Boolean = false) {
@@ -1676,8 +1777,115 @@ class MainActivity : AppCompatActivity() {
         customView = null
         customViewCallback = null
         if (!fromWebChrome) callback?.onCustomViewHidden()
+        applySystemBarAppearance()
         applyPersistentAddressBarPreference()
         showMenuButtonTemporarily()
+    }
+
+    /**
+     * Sets status/navigation bar icon contrast to match the active light/dark theme. Without
+     * this, dark icons over a dark bar (or light over light) can be invisible — a sunlight
+     * legibility and safety issue on a car display.
+     */
+    private fun applySystemBarAppearance() {
+        if (!::binding.isInitialized) return
+        val isNight = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        WindowInsetsControllerCompat(window, binding.root).apply {
+            isAppearanceLightStatusBars = !isNight
+            isAppearanceLightNavigationBars = !isNight
+        }
+    }
+
+    /**
+     * Creates the media session whose transport callbacks are routed back into the active
+     * media tab's page via JS, so HTML5 audio keeps playing in the background / while driving.
+     */
+    private fun setupMediaSession() {
+        mediaController = MediaSessionController(
+            applicationContext,
+            object : MediaSessionController.TransportCallback {
+                override fun onPlay() = evalOnMediaTab(MediaPlaybackBridge.playJs())
+                override fun onPause() = evalOnMediaTab(MediaPlaybackBridge.pauseJs())
+                override fun onStopRequested() = evalOnMediaTab(MediaPlaybackBridge.stopJs())
+                override fun onSeekTo(positionMs: Long) =
+                    evalOnMediaTab(MediaPlaybackBridge.seekJs(positionMs))
+            }
+        )
+    }
+
+    private fun evalOnMediaTab(js: String) {
+        runOnUiThread {
+            // Fail closed: only target the tab that actually owns playback. Falling back to the
+            // active `webView` when ownership is unknown could route play/pause/seek to the wrong tab.
+            val target = browserTabs.firstOrNull { it.id == mediaPlayingTabId }?.webView
+                ?: return@runOnUiThread
+            // The media tab may have been suspended (onPause) across a fg/bg cycle while paused;
+            // resume it so a notification Play/transport command can actually reach the page.
+            target.onResume()
+            target.resumeTimers()
+            target.evaluateJavascript(js, null)
+        }
+    }
+
+    /** Called (on the UI thread) when a tab's page reports an HTML5 media state change. */
+    private fun handleMediaState(tabId: Long, state: MediaPlaybackBridge.MediaState) {
+        val controller = mediaController ?: return
+        when (state.state) {
+            "playing" -> {
+                // Ownership guard: don't let a background tab's 5s heartbeat steal transport
+                // ownership from the tab the user is actually controlling.
+                if (mediaPlayingTabId == null || mediaPlayingTabId == tabId) {
+                    mediaPlayingTabId = tabId
+                } else if (!isMediaPlaying) {
+                    // No active owner is playing — adopt this tab.
+                    mediaPlayingTabId = tabId
+                } else {
+                    return
+                }
+                // Only push metadata on an actual track change (avoids a notification rebuild
+                // every 5s heartbeat); the steady tick just refreshes playback position.
+                if (state.title != lastMediaTitle || state.artist != lastMediaArtist ||
+                    state.durationMs != lastMediaDurationMs
+                ) {
+                    lastMediaTitle = state.title
+                    lastMediaArtist = state.artist
+                    lastMediaDurationMs = state.durationMs
+                    controller.updateMetadata(state.title, state.artist, null, state.durationMs)
+                }
+                hasActiveMediaSession = true
+                if (!isMediaPlaying) {
+                    isMediaPlaying = true
+                    controller.onPlaybackStarted(state.positionMs)
+                } else {
+                    controller.onPlaybackProgress(state.positionMs)
+                }
+                // Keep the screen awake while playback is advancing (both inline and fullscreen);
+                // symmetric with the unconditional clear in the paused/stopped branches.
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            "paused" -> {
+                if (tabId != mediaPlayingTabId) return
+                isMediaPlaying = false
+                controller.onPlaybackPaused(state.positionMs)
+                // Always release the screen-awake flag when playback stops advancing — keeping it
+                // set in fullscreen would defeat the "screen-on tied to playback" behavior and
+                // drain battery. (A live fullscreen video re-adds the flag via its own play event.)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            "stopped" -> {
+                if (tabId != mediaPlayingTabId) return
+                isMediaPlaying = false
+                hasActiveMediaSession = false
+                mediaPlayingTabId = null
+                lastMediaTitle = null
+                lastMediaArtist = null
+                lastMediaDurationMs = 0L
+                controller.onPlaybackStopped()
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
     }
 
     private fun addBookmarkForCurrentPage() {
@@ -2541,11 +2749,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun generateQrCode(content: String): Bitmap? {
+        if (content == START_PAGE_SPONSOR_URL) cachedSponsorQr?.let { return it }
         return try {
-            val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 512, 512)
-            val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
-            for (x in 0 until 512) for (y in 0 until 512) bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
-            bitmap
+            val size = 512
+            val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+            // One bulk setPixels() instead of 262k JNI setPixel() calls on the main thread.
+            val pixels = IntArray(size * size)
+            for (y in 0 until size) {
+                val rowOffset = y * size
+                for (x in 0 until size) {
+                    pixels[rowOffset + x] = if (bitMatrix[x, y]) Color.BLACK else Color.WHITE
+                }
+            }
+            // RGB_565 halves the bitmap memory vs ARGB_8888 — QR is opaque black/white, no alpha.
+            Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565).also { bitmap ->
+                bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
+                if (content == START_PAGE_SPONSOR_URL) cachedSponsorQr = bitmap
+            }
         } catch (_: Exception) { null }
     }
 

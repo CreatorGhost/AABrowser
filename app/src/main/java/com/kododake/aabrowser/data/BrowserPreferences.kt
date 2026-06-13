@@ -40,6 +40,8 @@ object BrowserPreferences {
     private const val KEY_START_PAGE_SLOTS = "start_page_slots"
     private const val KEY_START_PAGE_BACKGROUND_URI = "start_page_background_uri"
     private const val KEY_HOME_PAGE_URL = "home_page_url"
+    private const val KEY_USE_SYSTEM_COLORS = "use_system_colors"
+    private const val KEY_ANALYTICS_ENABLED = "analytics_enabled"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -57,6 +59,10 @@ object BrowserPreferences {
     const val MIN_GLOBAL_SCALE_PERCENT = 60
     const val MAX_GLOBAL_SCALE_PERCENT = 200
     const val DEFAULT_GLOBAL_SCALE_PERCENT = 100
+
+    // smallestScreenWidthDp threshold above which we treat the display as a head unit /
+    // large tablet (an 800x480 mdpi head unit reports sw=480dp; phones report ~320-420dp).
+    private const val LARGE_DISPLAY_SW_DP = 480
 
     fun getUserAgentProfile(context: Context): UserAgentProfile {
         val key = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -108,14 +114,30 @@ object BrowserPreferences {
     }
 
     fun shouldUseDesktopMode(context: Context): Boolean {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_DESKTOP_MODE, false)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_DESKTOP_MODE)) {
+            return prefs.getBoolean(KEY_DESKTOP_MODE, false)
+        }
+        // Smart default: car head units and large landscape displays render the full
+        // desktop players for Netflix/YouTube/Crunchyroll far better than phone layouts.
+        // Phones keep the mobile default. Any explicit user toggle wins from then on.
+        return isLikelyCarOrLargeDisplay(context)
+    }
+
+    fun isLikelyCarOrLargeDisplay(context: Context): Boolean {
+        val config = context.resources.configuration
+        val isCar = (config.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+            Configuration.UI_MODE_TYPE_CAR
+        return isCar || config.smallestScreenWidthDp >= LARGE_DISPLAY_SW_DP
     }
 
     fun toggleDesktopMode(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val useDesktop = !prefs.getBoolean(KEY_DESKTOP_MODE, false)
-        prefs.edit().putBoolean(KEY_DESKTOP_MODE, useDesktop).apply()
+        // Negate the EFFECTIVE current state (which honors the car/large-display smart default),
+        // not the raw stored value — otherwise the first toggle on a car display writes `true`
+        // again (no visible change) instead of disabling desktop mode.
+        val useDesktop = !shouldUseDesktopMode(context)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_DESKTOP_MODE, useDesktop).apply()
         return useDesktop
     }
 
@@ -123,6 +145,39 @@ object BrowserPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_DESKTOP_MODE, enabled)
+            .apply()
+    }
+
+    /**
+     * When true, Material You wallpaper-derived colors override the app's curated brand
+     * palette. Default false so the designed brand/AMOLED theme actually ships.
+     */
+    fun shouldUseSystemColors(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_USE_SYSTEM_COLORS, false)
+    }
+
+    fun setUseSystemColors(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_USE_SYSTEM_COLORS, enabled)
+            .apply()
+    }
+
+    /**
+     * Anonymous usage analytics. Default FALSE (opt-in): UmamiTracker persists a random UUID as
+     * user_id, which is personal data under GDPR/ePrivacy, so the privacy-safe posture is off
+     * until the user explicitly enables it in Settings.
+     */
+    fun isAnalyticsEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ANALYTICS_ENABLED, false)
+    }
+
+    fun setAnalyticsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ANALYTICS_ENABLED, enabled)
             .apply()
     }
 
