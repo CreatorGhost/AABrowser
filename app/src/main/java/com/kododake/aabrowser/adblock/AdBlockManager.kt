@@ -127,15 +127,19 @@ object AdBlockManager {
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return
                 val body = resp.body ?: return
-                if (body.contentLength() in 1..MAX_REMOTE_BYTES || body.contentLength() == -1L) {
-                    val text = body.string()
-                    if (text.length < 1024) return // sanity: not a real list
-                    cache.writeText(text)
-                    val hosts = HashSet<String>(blockedHosts)
-                    text.lineSequence().forEach { parseHostLine(it)?.let(hosts::add) }
-                    blockedHosts = hosts
-                    BrowserPreferences.setAdBlockListUpdatedAt(context, now)
-                }
+                // Enforce a HARD streaming cap on the actual bytes — never trust Content-Length
+                // (chunked / -1 / under-reported lengths would otherwise bypass the limit and
+                // could buffer an unbounded response into memory + internal storage).
+                val source = body.source()
+                source.request(MAX_REMOTE_BYTES + 1)
+                if (source.buffer.size > MAX_REMOTE_BYTES) return // oversized → bail, write nothing
+                val text = source.buffer.readUtf8()
+                if (text.length < 1024) return // sanity: not a real list
+                cache.writeText(text)
+                val hosts = HashSet<String>(blockedHosts)
+                text.lineSequence().forEach { parseHostLine(it)?.let(hosts::add) }
+                blockedHosts = hosts
+                BrowserPreferences.setAdBlockListUpdatedAt(context, now)
             }
         }
     }

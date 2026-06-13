@@ -1130,6 +1130,15 @@ object SettingsViews {
                 com.kododake.aabrowser.adblock.AdBlockManager.setEnabled(context, isChecked)
             }
         )
+        adBlockInner.addView(
+            buildSwitchRow(
+                title = context.getString(R.string.settings_sponsorblock_toggle),
+                description = context.getString(R.string.settings_sponsorblock_toggle_description),
+                initialChecked = BrowserPreferences.isSponsorBlockEnabled(context)
+            ) { isChecked ->
+                BrowserPreferences.setSponsorBlockEnabled(context, isChecked)
+            }
+        )
         adBlockCard.addView(adBlockInner)
         container.addView(adBlockCard)
 

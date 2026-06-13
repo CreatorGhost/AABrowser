@@ -120,7 +120,9 @@
 
 | ID | St | Item | Eff | Notes |
 |----|----|------|-----|-------|
+
 > **STABLE TIER chosen + implemented** on `feat/adblock-stable` (pure-Kotlin/JS, no NDK).
+
 | AD1 | [x] | Settings toggle + per-host allowlist + global off | small | `BrowserPreferences` adblock prefs; "Ad blocking" settings card |
 | AD2 | [x] | Hosts blocker via `shouldInterceptRequest` (curated asset → HashSet, parent-domain match) | small | `AdBlockManager.shouldBlock`; main-frame-safe; off-UI-thread safe |
 | AD3 | [-] | Full ABP/adblock-rust engine | large | **DEFERRED** (needs NDK/Rust) — hosts list covers the bulk; future upgrade |
@@ -239,6 +241,17 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
   General web + FB feed achievable; YouTube ads NOT durably (SSAI). → Sprint AD; **awaiting user
   scope choice** (how far to go, given YouTube maintenance burden).
 - **2026-06-13** — Build env: created `local.properties` (sdk.dir, gitignored). gradlew chmod +x.
+- **2026-06-13** — **OSS ad-block engine (Edsuns/AdblockAndroid) investigated and REJECTED.**
+  Resolves on JitPack, but hard-depends on JetBrains **Anko** (dead, jcenter-only) →
+  `anko-commons/anko-design FAILED` from Maven Central; would crash at runtime. Pulling a dead
+  lib via an unofficial jcenter mirror for a shipped car app = too risky. Kept the in-app blocker
+  driven by OSS filter *data* (StevenBlack = EasyList/AdGuard aggregate).
+- **2026-06-13** — PR #1 CodeRabbit review: 8 findings, all fixed in `7e9ccd4` (pushed).
+- **2026-06-13** — Ad-block self-review (`wcbw2ryqx`): fixed streaming byte-cap (Okio, no
+  Content-Length trust); SponsorBlock now opt-in + discloses the sponsor.ajay.app call; cosmetic/
+  FB/SponsorBlock injection moved to onPageStarted (live toggle, not frozen at construction).
+  Pop-up/pop-under ads blocked via the onCreateWindow gesture gate. Per-site exception UI =
+  tracked follow-up (global toggle is the working escape hatch).
 
 ## Artifacts
 - Deep audit (49 findings, 8 agents): session task `wsm42ntc4`.

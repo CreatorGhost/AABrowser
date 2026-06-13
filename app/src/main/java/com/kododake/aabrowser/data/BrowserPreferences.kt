@@ -45,6 +45,7 @@ object BrowserPreferences {
     private const val KEY_ADBLOCK_ENABLED = "adblock_enabled"
     private const val KEY_ADBLOCK_DISABLED_HOSTS = "adblock_disabled_hosts"
     private const val KEY_ADBLOCK_LIST_UPDATED = "adblock_list_updated_at"
+    private const val KEY_SPONSORBLOCK_ENABLED = "sponsorblock_enabled"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -203,6 +204,23 @@ object BrowserPreferences {
 
     fun addHostAdBlockDisabled(context: Context, host: String) =
         addAllowedHost(context, KEY_ADBLOCK_DISABLED_HOSTS, host)
+
+    /**
+     * SponsorBlock (skip YouTube creator sponsor segments). Default FALSE / opt-in: it sends the
+     * current YouTube video ID to the third-party server sponsor.ajay.app, so it's off until the
+     * user explicitly enables it (and the settings copy discloses the network call).
+     */
+    fun isSponsorBlockEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SPONSORBLOCK_ENABLED, false)
+    }
+
+    fun setSponsorBlockEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SPONSORBLOCK_ENABLED, enabled)
+            .apply()
+    }
 
     fun getAdBlockListUpdatedAt(context: Context): Long {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

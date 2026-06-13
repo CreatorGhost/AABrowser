@@ -21,7 +21,6 @@ import android.webkit.WebViewClient
 import androidx.core.net.toUri
 import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.adblock.AdBlockManager
@@ -100,34 +99,14 @@ fun configureWebView(
             it.setAcceptThirdPartyCookies(this, true)
         }
 
-        // Cosmetic ad-hiding + SponsorBlock run at document-start (before page scripts) when the
-        // WebView supports it — collapses ad gaps and skips YouTube sponsor segments. Network-level
-        // ad blocking is handled live in shouldInterceptRequest below.
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            if (AdBlockManager.enabled) {
-                runCatching {
-                    WebViewCompat.addDocumentStartJavaScript(this, AdBlockManager.cosmeticCssJs(), setOf("*"))
-                }
-                runCatching {
-                    WebViewCompat.addDocumentStartJavaScript(
-                        this,
-                        AdBlockManager.FACEBOOK_COSMETIC_JS,
-                        setOf("https://www.facebook.com", "https://m.facebook.com", "https://facebook.com")
-                    )
-                }
-            }
-            runCatching {
-                WebViewCompat.addDocumentStartJavaScript(
-                    this,
-                    SponsorBlock.JS,
-                    setOf("https://www.youtube.com", "https://m.youtube.com", "https://youtube.com")
-                )
-            }
-        }
-
-        // Set on the UI thread (onPageStarted) when the current page's host is on the ad-block
-        // allowlist; read on the intercept thread to skip blocking for that page. AtomicBoolean
-        // because shouldInterceptRequest runs off the UI thread.
+        // Cosmetic ad-hiding (collapse leftover ad gaps), the Facebook in-feed hider, and
+        // SponsorBlock are injected per page load in onPageStarted (NOT registered once at
+        // construction) so the live ad-block / SponsorBlock toggles and the per-site allowlist
+        // take effect on the next page load instead of being frozen at WebView creation.
+        //
+        // adBlockDisabledForPage is set on the UI thread (onPageStarted) when the current page's
+        // host is on the ad-block allowlist; read on the intercept thread to skip blocking for
+        // that page. AtomicBoolean because shouldInterceptRequest runs off the UI thread.
         val adBlockDisabledForPage = AtomicBoolean(false)
 
         //setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -170,7 +149,24 @@ fun configureWebView(
 
                 // Refresh the per-page ad-block allowlist flag on the UI thread for the
                 // intercept thread to read.
-                adBlockDisabledForPage.set(AdBlockManager.isHostAllowlisted(view.context, uri.host))
+                val allowlisted = AdBlockManager.isHostAllowlisted(view.context, uri.host)
+                adBlockDisabledForPage.set(allowlisted)
+
+                // Inject cosmetic hiding (and the Facebook in-feed hider) when ad-blocking is on
+                // for this page; gated live so the toggle/allowlist take effect on next load.
+                val host = uri.host?.lowercase().orEmpty()
+                if (AdBlockManager.enabled && !allowlisted) {
+                    view.evaluateJavascript(AdBlockManager.cosmeticCssJs(), null)
+                    if (host.endsWith("facebook.com")) {
+                        view.evaluateJavascript(AdBlockManager.FACEBOOK_COSMETIC_JS, null)
+                    }
+                }
+                // SponsorBlock is independently opt-in (it contacts a third-party server).
+                if (host.endsWith("youtube.com") &&
+                    com.kododake.aabrowser.data.BrowserPreferences.isSponsorBlockEnabled(view.context)
+                ) {
+                    view.evaluateJavascript(SponsorBlock.JS, null)
+                }
 
                 if (scheme == "http") {
                     val allowedOnce = getTag(R.id.webview_allow_once_uri_tag) as? String
