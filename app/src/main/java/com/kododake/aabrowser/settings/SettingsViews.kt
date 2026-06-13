@@ -1132,6 +1132,15 @@ object SettingsViews {
         )
         adBlockInner.addView(
             buildSwitchRow(
+                title = context.getString(R.string.settings_popup_toggle),
+                description = context.getString(R.string.settings_popup_toggle_description),
+                initialChecked = BrowserPreferences.isPopupBlockEnabled(context)
+            ) { isChecked ->
+                BrowserPreferences.setPopupBlockEnabled(context, isChecked)
+            }
+        )
+        adBlockInner.addView(
+            buildSwitchRow(
                 title = context.getString(R.string.settings_sponsorblock_toggle),
                 description = context.getString(R.string.settings_sponsorblock_toggle_description),
                 initialChecked = BrowserPreferences.isSponsorBlockEnabled(context)

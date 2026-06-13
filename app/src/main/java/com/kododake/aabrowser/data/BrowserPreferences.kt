@@ -46,6 +46,7 @@ object BrowserPreferences {
     private const val KEY_ADBLOCK_DISABLED_HOSTS = "adblock_disabled_hosts"
     private const val KEY_ADBLOCK_LIST_UPDATED = "adblock_list_updated_at"
     private const val KEY_SPONSORBLOCK_ENABLED = "sponsorblock_enabled"
+    private const val KEY_POPUP_BLOCK_ENABLED = "popup_block_enabled"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -220,6 +221,19 @@ object BrowserPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_SPONSORBLOCK_ENABLED, enabled)
+            .apply()
+    }
+
+    /** Block pop-ups / pop-unders / redirect & dialog storms. Default true (on). */
+    fun isPopupBlockEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_POPUP_BLOCK_ENABLED, true)
+    }
+
+    fun setPopupBlockEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_POPUP_BLOCK_ENABLED, enabled)
             .apply()
     }
 

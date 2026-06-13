@@ -145,6 +145,7 @@ class MainActivity : AppCompatActivity() {
     private var lastUiModeNight: Int = 0
     private var lastDensityDpi: Int = 0
     private var lastLocales: String = ""
+    private var lastPopupBlockedToastAt: Long = 0L
 
     override fun attachBaseContext(newBase: Context?) {
         if (newBase == null) {
@@ -876,8 +877,17 @@ class MainActivity : AppCompatActivity() {
             },
             onRendererGone = { goneWebView, _ ->
                 runOnUiThread { recoverFromRendererGone(goneWebView) }
-            }
+            },
+            onPopupBlocked = { runOnUiThread { notifyPopupBlocked() } }
         )
+    }
+
+    /** Subtle, debounced feedback so the user knows a pop-up/dialog storm was blocked. */
+    private fun notifyPopupBlocked() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastPopupBlockedToastAt < 4000L) return
+        lastPopupBlockedToastAt = now
+        Toast.makeText(this, R.string.popup_blocked_toast, Toast.LENGTH_SHORT).show()
     }
 
     /**

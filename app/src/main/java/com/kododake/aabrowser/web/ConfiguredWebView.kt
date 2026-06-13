@@ -47,7 +47,9 @@ data class BrowserCallbacks(
     val onCreateWindowRequest: (Message) -> Boolean = { false },
     val onCloseWindowRequest: (WebView) -> Unit = {},
     /** The WebView's renderer process died (crash or OOM-kill). Host must recover the tab. */
-    val onRendererGone: (WebView, didCrash: Boolean) -> Unit = { _, _ -> }
+    val onRendererGone: (WebView, didCrash: Boolean) -> Unit = { _, _ -> },
+    /** A pop-up / pop-under / dialog storm was blocked — host may surface subtle feedback. */
+    val onPopupBlocked: () -> Unit = {}
 )
 
 fun configureWebView(
@@ -267,9 +269,60 @@ fun configureWebView(
             }
         }
 
+        // Per-tab annoyance-guard state (this closure is created once per tab).
+        var jsDialogWindowStart = 0L
+        var jsDialogCount = 0
+        var suppressDialogsForPage = false
+        var lastPopupAt = 0L
+
+        fun popupBlockOn(ctx: android.content.Context?): Boolean =
+            ctx != null && com.kododake.aabrowser.data.BrowserPreferences.isPopupBlockEnabled(ctx)
+
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 callbacks.onProgressChange(newProgress)
+            }
+
+            // Suppress the "Leave site? Changes may not be saved" hostage prompt that sketchy
+            // sites abuse to trap the user — auto-allow leaving.
+            override fun onJsBeforeUnload(
+                view: WebView?, url: String?, message: String?,
+                result: android.webkit.JsResult?
+            ): Boolean {
+                if (!popupBlockOn(view?.context)) return super.onJsBeforeUnload(view, url, message, result)
+                result?.confirm()
+                return true
+            }
+
+            // Rate-limit alert/confirm/prompt so a JS loop can't spam dialogs; after a burst,
+            // silently dismiss further dialogs from this page until it navigates/reloads.
+            private fun rateLimitDialog(view: WebView?, result: android.webkit.JsResult?): Boolean {
+                if (!popupBlockOn(view?.context)) return false
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - jsDialogWindowStart > 4000L) { jsDialogWindowStart = now; jsDialogCount = 0; suppressDialogsForPage = false }
+                jsDialogCount++
+                if (suppressDialogsForPage || jsDialogCount > 2) {
+                    suppressDialogsForPage = true
+                    result?.cancel()
+                    callbacks.onPopupBlocked()
+                    return true
+                }
+                return false
+            }
+
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: android.webkit.JsResult?): Boolean {
+                if (rateLimitDialog(view, result)) return true
+                return super.onJsAlert(view, url, message, result)
+            }
+
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: android.webkit.JsResult?): Boolean {
+                if (rateLimitDialog(view, result)) return true
+                return super.onJsConfirm(view, url, message, result)
+            }
+
+            override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: android.webkit.JsPromptResult?): Boolean {
+                if (rateLimitDialog(view, result)) return true
+                return super.onJsPrompt(view, url, message, defaultValue, result)
             }
 
             override fun onReceivedTitle(view: WebView?, title: String?) {
@@ -327,7 +380,14 @@ fun configureWebView(
                 // Only honor popups triggered by a real user gesture (e.g. tapping "Sign in with
                 // Google/Apple"). Refusing programmatic window.open() blocks popup-spam / focus-
                 // steal / lookalike-tab phishing while preserving genuine OAuth flows.
-                if (!isUserGesture) return false
+                if (!isUserGesture) { callbacks.onPopupBlocked(); return false }
+                // Burst cap: a single tap that tries to open several windows in quick succession
+                // is a pop-under storm — allow the first, block the rest.
+                if (popupBlockOn(view?.context)) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastPopupAt < 1200L) { callbacks.onPopupBlocked(); return false }
+                    lastPopupAt = now
+                }
                 // Route the popup to the host so it opens as a real in-app tab via WebViewTransport.
                 return callbacks.onCreateWindowRequest(resultMsg)
             }
