@@ -261,6 +261,19 @@ class MainActivity : AppCompatActivity() {
         refreshStartPage()
     }
 
+    /**
+     * recreate() rebuilds the Activity — which tears down every tab WebView and the media session.
+     * Doing that while audio/video is playing is one of the "playback suddenly stops" bugs, so we
+     * defer the theme/scale change until playback ends rather than yanking it mid-stream.
+     */
+    private fun recreateUnlessPlayingMedia() {
+        if (hasActiveMediaSession) {
+            Toast.makeText(this, R.string.settings_applies_after_playback, Toast.LENGTH_SHORT).show()
+            return
+        }
+        recreate()
+    }
+
     override fun onDestroy() {
         handler.removeCallbacks(autoHideMenuFab)
         handler.removeCallbacks(showMenuFabRunnable)
@@ -2766,13 +2779,13 @@ class MainActivity : AppCompatActivity() {
                 includeDragHandle = false,
                 callbacks = com.kododake.aabrowser.settings.SettingsCallbacks(
                     onClose = { hideSettingsView() },
-                    onThemeChanged = { recreate() },
+                    onThemeChanged = { recreateUnlessPlayingMedia() },
                     onPageDarkeningChanged = {
                         browserTabs.forEach { tab ->
                             tab.webView.updatePageDarkening(BrowserPreferences.isBetaForceDarkPagesEnabled(this))
                         }
                     },
-                    onScaleChanged = { recreate() },
+                    onScaleChanged = { recreateUnlessPlayingMedia() },
                     onHomePageChanged = { handleHomePagePreferenceChanged() },
                     onInAppControlsChanged = {
                         applyPersistentAddressBarPreference()
