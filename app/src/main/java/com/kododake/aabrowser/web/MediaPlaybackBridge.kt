@@ -89,27 +89,66 @@ class MediaPlaybackBridge(
                   }));
                 } catch (e) {}
               }
+              // Debounce timers so transient buffering/seek/segment/ad-boundary events on custom
+              // players (Netflix/Twitch/Crunchyroll/YouTube ads) don't flip our state spuriously.
+              var pauseTimer = null, endedTimer = null;
+              function clearTimers() {
+                if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+                if (endedTimer) { clearTimeout(endedTimer); endedTimer = null; }
+              }
+              function anyPlaying() {
+                var meds = document.querySelectorAll('video, audio');
+                for (var i = 0; i < meds.length; i++) {
+                  if (!meds[i].paused && !meds[i].ended) return meds[i];
+                }
+                return null;
+              }
               document.addEventListener('play', function(e) {
                 var t = e.target;
                 if (t && (t.tagName === 'VIDEO' || t.tagName === 'AUDIO')) {
-                  active = t; report('playing');
+                  clearTimers(); active = t; report('playing');
                 }
               }, true);
+              document.addEventListener('playing', function(e) {
+                var t = e.target;
+                if (t && (t.tagName === 'VIDEO' || t.tagName === 'AUDIO')) {
+                  clearTimers(); active = t; report('playing');
+                }
+              }, true);
+              // A 'pause' is only real if playback doesn't resume shortly (rebuffering, ABR/quality
+              // switches, seeking and DRM key rotation all fire pause->play pairs).
               document.addEventListener('pause', function(e) {
-                if (e.target === active) report('paused');
+                if (e.target !== active) return;
+                if (pauseTimer) clearTimeout(pauseTimer);
+                pauseTimer = setTimeout(function() {
+                  pauseTimer = null;
+                  if (active && active.paused && !active.ended) report('paused');
+                }, 900);
               }, true);
+              // 'ended' is a soft end-of-item: another element (next video, next episode, post-ad
+              // content) may start. Only a real stop if nothing is playing after a short grace.
               document.addEventListener('ended', function(e) {
-                if (e.target === active) report('stopped');
+                if (e.target !== active) return;
+                if (endedTimer) clearTimeout(endedTimer);
+                endedTimer = setTimeout(function() {
+                  endedTimer = null;
+                  var next = anyPlaying();
+                  if (next) { clearTimers(); active = next; report('playing'); }
+                  else report('stopped');
+                }, 1500);
               }, true);
+              // Heartbeat: re-point 'active' (ad->content swap, SPA video changes) and keep state live.
               setInterval(function() {
-                if (active && !active.paused && !active.ended) report('playing');
-              }, 5000);
+                if (active && !active.paused && !active.ended) { report('playing'); return; }
+                var p = anyPlaying();
+                if (p) { clearTimers(); active = p; report('playing'); }
+              }, 3000);
               window.__aaMediaControl = {
-                play: function() { var el = pick(); if (el) { active = el; el.play(); } },
-                pause: function() { var el = active || pick(); if (el) el.pause(); },
+                play: function() { clearTimers(); var el = pick(); if (el) { active = el; el.play(); } },
+                pause: function() { clearTimers(); var el = active || pick(); if (el) el.pause(); report('paused'); },
                 // Stop must drive a full teardown: pause, then report 'stopped' so the native
                 // side abandons audio focus (a plain pause would only report 'paused').
-                stop: function() { var el = active || pick(); if (el) el.pause(); report('stopped'); active = null; },
+                stop: function() { clearTimers(); var el = active || pick(); if (el) el.pause(); report('stopped'); active = null; },
                 seek: function(ms) { if (active && isFinite(active.duration)) active.currentTime = ms / 1000; }
               };
             })();

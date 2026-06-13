@@ -135,6 +135,9 @@ class MainActivity : AppCompatActivity() {
     // True from first "playing" until "stopped" (covers paused-but-resumable). Used to keep the
     // media tab's WebView alive across background/tab-switch so it can resume from the notification.
     private var hasActiveMediaSession: Boolean = false
+    // Set on the binder thread the instant the page reports "playing", before the UI-thread
+    // handler runs — closes the race where a transient onPause suspends the WebView mid-start.
+    @Volatile private var mediaIntentActive: Boolean = false
     private var lastMediaTitle: String? = null
     private var lastMediaArtist: String? = null
     private var lastMediaDurationMs: Long = 0L
@@ -215,8 +218,9 @@ class MainActivity : AppCompatActivity() {
         CookieManager.getInstance().flush()
         // On a transient interruption (heads-up call, permission dialog, system overlay,
         // multi-window) onStop does NOT fire, so without this the WebView keeps decoding video
-        // and running JS timers — wasting CPU/battery. Skip only when media should keep playing.
-        if (!hasActiveMediaSession) {
+        // and running JS timers — wasting CPU/battery. Skip only when media should keep playing
+        // (mediaIntentActive covers the race where "playing" hasn't reached the UI thread yet).
+        if (!hasActiveMediaSession && !mediaIntentActive) {
             exitFullscreen()
             webView?.onPause()
         }
@@ -229,7 +233,7 @@ class MainActivity : AppCompatActivity() {
         // session, so audio continues in the background / while driving (the foreground service
         // keeps the process alive); the video surface is gone but audio — the legitimate part — survives.
         exitFullscreen()
-        if (!hasActiveMediaSession) {
+        if (!hasActiveMediaSession && !mediaIntentActive) {
             webView?.onPause()
         }
         super.onStop()
@@ -712,6 +716,13 @@ class MainActivity : AppCompatActivity() {
             requestSpeechRecognitionMicrophoneAccess(tab.id, pageUrl)
         }
         val mediaBridge = MediaPlaybackBridge { state ->
+            // Set the intent flag synchronously on the binder thread BEFORE posting to the UI
+            // thread — so a transient onPause that fires before the posted Runnable runs still
+            // sees that media is (about to be) active and won't suspend the WebView mid-start.
+            when (state.state) {
+                "playing" -> mediaIntentActive = true
+                "stopped" -> mediaIntentActive = false
+            }
             runOnUiThread { handleMediaState(tab.id, state) }
         }
         tab = BrowserTab(
@@ -883,6 +894,7 @@ class MainActivity : AppCompatActivity() {
             mediaPlayingTabId = null
             isMediaPlaying = false
             hasActiveMediaSession = false
+            mediaIntentActive = false
             mediaController?.onPlaybackStopped()
         }
         closeTab(tab.id)
@@ -1001,6 +1013,7 @@ class MainActivity : AppCompatActivity() {
             mediaPlayingTabId = null
             isMediaPlaying = false
             hasActiveMediaSession = false
+            mediaIntentActive = false
             lastMediaTitle = null
             lastMediaArtist = null
             lastMediaDurationMs = 0L
@@ -1933,6 +1946,7 @@ class MainActivity : AppCompatActivity() {
         val controller = mediaController ?: return
         when (state.state) {
             "playing" -> {
+                mediaIntentActive = true
                 // Ownership guard: don't let a background tab's 5s heartbeat steal transport
                 // ownership from the tab the user is actually controlling.
                 if (mediaPlayingTabId == null || mediaPlayingTabId == tabId) {
@@ -1942,6 +1956,11 @@ class MainActivity : AppCompatActivity() {
                     mediaPlayingTabId = tabId
                 } else {
                     return
+                }
+                // If a transient onPause suspended this tab's WebView just before "playing"
+                // arrived (lifecycle race), resume it so playback isn't left frozen.
+                browserTabs.firstOrNull { it.id == tabId }?.webView?.apply {
+                    onResume(); resumeTimers()
                 }
                 // Only push metadata on an actual track change (avoids a notification rebuild
                 // every 5s heartbeat); the steady tick just refreshes playback position.
@@ -1977,6 +1996,7 @@ class MainActivity : AppCompatActivity() {
                 if (tabId != mediaPlayingTabId) return
                 isMediaPlaying = false
                 hasActiveMediaSession = false
+                mediaIntentActive = false
                 mediaPlayingTabId = null
                 lastMediaTitle = null
                 lastMediaArtist = null
