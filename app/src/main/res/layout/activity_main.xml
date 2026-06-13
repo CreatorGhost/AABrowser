@@ -59,11 +59,25 @@
                 android:clipToPadding="false"
                 android:padding="24dp">
 
+                <!-- Two-pane: hero (left) + media shelves (right) on a head unit; stacks on a
+                     phone. Orientation + weights are set at runtime in applyStartPageColumnsOrientation(). -->
                 <LinearLayout
+                    android:id="@+id/startPageColumns"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="start">
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical">
+
+                    <!-- LEFT pane: cinematic hero (kicker, headline, search + voice mic). -->
+                    <LinearLayout
+                        android:id="@+id/startPageHeroPane"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center_vertical"
+                        android:paddingEnd="22dp">
 
                     <TextView
                         android:id="@+id/startPageSubtitle"
@@ -86,106 +100,71 @@
                         android:letterSpacing="-0.02"
                         android:textColor="#F2F5FB" />
 
-                    <!-- Cinematic hero search pill (B): tap to type, mic for voice -->
+                    <!-- barwrap (B): slim search bar + glowing electric-blue voice mic. -->
                     <LinearLayout
-                        android:id="@+id/startPageSearchPill"
-                        android:layout_width="match_parent"
-                        android:layout_height="64dp"
-                        android:layout_marginTop="22dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:background="@drawable/start_page_search_pill_bg"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:paddingStart="20dp"
-                        android:paddingEnd="8dp">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/search_24px"
-                            app:tint="?attr/colorOnSurfaceVariant"
-                            android:contentDescription="@null" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="14dp"
-                            android:text="@string/menu_address_label"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/startPageMic"
-                            style="@style/Widget.Material3.Button.IconButton.Filled"
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
-                            app:icon="@drawable/search_24px"
-                            app:iconGravity="textStart"
-                            app:iconPadding="0dp"
-                            android:contentDescription="@string/menu_address_label" />
-                    </LinearLayout>
-
-                    <!-- De-boxed: tiles float on the hero; "Jump back in" is just a shelf label -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/startPageCard"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="28dp"
-                        app:cardCornerRadius="0dp"
-                        app:cardElevation="0dp"
-                        app:strokeWidth="0dp"
-                        app:cardBackgroundColor="@android:color/transparent">
+                        android:layout_marginTop="24dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
                         <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
+                            android:id="@+id/startPageSearchPill"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="64dp"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:background="@drawable/start_page_search_pill_bg"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:paddingStart="20dp"
+                            android:paddingEnd="20dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/search_24px"
+                                app:tint="?attr/colorOnSurfaceVariant"
+                                android:contentDescription="@null" />
 
                             <TextView
-                                android:id="@+id/startPageCardTitle"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/start_page_card_title"
-                                android:textAllCaps="true"
-                                android:letterSpacing="0.14"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                                android:textColor="#9AA6BC" />
-
-                            <TextView
-                                android:id="@+id/startPageCardSubtitle"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:visibility="gone"
-                                android:text="@string/start_page_card_subtitle" />
-
-                            <LinearLayout
-                                android:id="@+id/startPageQuickLinksContainer"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="14dp"
-                                android:orientation="vertical" />
-
-                            <TextView
-                                android:id="@+id/startPageQuickLinksHint"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="12dp"
-                                android:text="@string/start_page_quick_links_hint"
-                                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                                android:textColor="#7E889C" />
+                                android:layout_weight="1"
+                                android:layout_marginStart="14dp"
+                                android:text="@string/menu_address_label"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
 
+                        <FrameLayout
+                            android:id="@+id/startPageMic"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:layout_marginStart="14dp"
+                            android:background="@drawable/start_page_mic_bg"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="@string/start_page_voice_search">
+
+                            <ImageView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/mic_24px"
+                                app:tint="#FFFFFF"
+                                android:contentDescription="@null" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <!-- hero footer: compact utility toggles -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="20dp"
                         android:orientation="horizontal"
-                        android:gravity="center">
+                        android:gravity="center_vertical">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/buttonStartPageResume"
@@ -208,7 +187,6 @@
                             style="?attr/materialButtonTonalStyle"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
                             android:minHeight="48dp"
                             android:paddingStart="16dp"
                             android:paddingEnd="16dp"
@@ -218,6 +196,64 @@
                             app:iconPadding="8dp"
                             app:cornerRadius="24dp" />
                     </LinearLayout>
+
+                    </LinearLayout>
+                    <!-- /LEFT pane -->
+
+                    <!-- RIGHT pane: media shelves (Jump back in + Continue). -->
+                    <LinearLayout
+                        android:id="@+id/startPageShelfPane"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/startPageCardTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/start_page_card_title"
+                            android:textAllCaps="true"
+                            android:letterSpacing="0.14"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:textColor="#9AA6BC" />
+
+                        <LinearLayout
+                            android:id="@+id/startPageQuickLinksContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:orientation="vertical" />
+
+                        <TextView
+                            android:id="@+id/startPageQuickLinksHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/start_page_quick_links_hint"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="#7E889C" />
+
+                        <TextView
+                            android:id="@+id/continueWatchingLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="26dp"
+                            android:text="@string/start_page_continue_label"
+                            android:textAllCaps="true"
+                            android:letterSpacing="0.14"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:textColor="#9AA6BC"
+                            android:visibility="gone" />
+
+                        <LinearLayout
+                            android:id="@+id/continueWatchingContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical"
+                            android:visibility="gone" />
 
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/startPageDonateCard"
@@ -326,6 +362,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="88dp"
                         android:importantForAccessibility="no" />
+                    </LinearLayout>
+                    <!-- /RIGHT pane -->
                 </LinearLayout>
             </androidx.core.widget.NestedScrollView>
         </FrameLayout>

@@ -2467,7 +2467,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyStartPagePhotoOnlyMode() {
         if (!::binding.isInitialized) return
         binding.startPageScroll.visibility = if (isStartPagePhotoOnlyMode) View.GONE else View.VISIBLE
-        binding.startPageDimOverlay.visibility = if (isStartPagePhotoOnlyMode) View.GONE else View.VISIBLE
+        updateStartPageScrim()
         binding.buttonStartPagePhotoOnly.text = getString(
             if (isStartPagePhotoOnlyMode) R.string.start_page_show_ui else R.string.start_page_photo_only
         )
@@ -2482,13 +2482,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshStartPage() {
+        applyStartPageColumnsOrientation()
         refreshStartPageQuickLinks()
+        refreshContinueWatching()
         refreshStartPageBackground()
         refreshStartPageResumeButton()
     }
 
     private fun refreshStartPageBackground() {
         applyDynamicStartPageGradientBackground()
+        updateStartPageScrim()
         val backgroundUri = BrowserPreferences.getStartPageBackgroundUri(this)
         if (backgroundUri.isNullOrBlank()) {
             loadedStartPageBackgroundBitmap?.recycle()
@@ -2524,55 +2527,138 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyDynamicStartPageGradientBackground() {
-        val baseSurface = resolveThemeColor(com.google.android.material.R.attr.colorSurface)
-        val primaryContainer = resolveThemeColor(com.google.android.material.R.attr.colorPrimaryContainer)
-        val secondaryContainer = resolveThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
-        val tertiaryContainer = resolveThemeColor(com.google.android.material.R.attr.colorTertiaryContainer)
-
-        val signature = baseSurface xor primaryContainer xor secondaryContainer xor tertiaryContainer
-        if (cachedStartPageGradientSignature == signature) return
-
-        val linearStart = ColorUtils.blendARGB(baseSurface, secondaryContainer, 0.30f)
-        val linearMid = ColorUtils.blendARGB(baseSurface, tertiaryContainer, 0.28f)
-        val linearEnd = ColorUtils.blendARGB(baseSurface, primaryContainer, 0.30f)
-
-        val ribbonA = ColorUtils.blendARGB(primaryContainer, tertiaryContainer, 0.45f)
-        val ribbonB = ColorUtils.blendARGB(secondaryContainer, primaryContainer, 0.50f)
-        val ribbonC = ColorUtils.blendARGB(tertiaryContainer, secondaryContainer, 0.42f)
+        // Fixed cinematic hero (matches the approved "B" mockup): a deep-blue → black vertical
+        // gradient with one electric-blue glow at the top-right. Deliberately NOT theme-derived —
+        // the brand home is always this look. The glow keeps it "not too dark"; when the user sets a
+        // photo background we drop a balanced legibility scrim instead (see updateStartPageScrim()).
+        // cachedStartPageGradientSignature is reset to 0 on config changes to force a rebuild.
+        if (cachedStartPageGradientSignature == 1) return
+        val density = resources.displayMetrics.density
 
         val baseLayer = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(linearStart, linearMid, linearEnd)
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0xFF06122E.toInt(), 0xFF030712.toInt(), Color.BLACK)
         ).apply {
             gradientType = GradientDrawable.LINEAR_GRADIENT
         }
 
-        val blobA = GradientDrawable().apply {
+        val glow = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = resources.displayMetrics.density * 460f
-            setGradientCenter(0.18f, 0.22f)
-            colors = intArrayOf(ColorUtils.setAlphaComponent(ribbonA, 170), Color.TRANSPARENT)
+            gradientRadius = density * 620f
+            setGradientCenter(0.82f, 0.16f)
+            colors = intArrayOf(ColorUtils.setAlphaComponent(0xFF1565FF.toInt(), 150), Color.TRANSPARENT)
         }
 
-        val blobB = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = resources.displayMetrics.density * 520f
-            setGradientCenter(0.78f, 0.30f)
-            colors = intArrayOf(ColorUtils.setAlphaComponent(ribbonB, 160), Color.TRANSPARENT)
-        }
+        binding.startPageRoot.background = LayerDrawable(arrayOf(baseLayer, glow))
+        cachedStartPageGradientSignature = 1
+    }
 
-        val blobC = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = resources.displayMetrics.density * 540f
-            setGradientCenter(0.55f, 0.82f)
-            colors = intArrayOf(ColorUtils.setAlphaComponent(ribbonC, 150), Color.TRANSPARENT)
-        }
+    private fun hasStartPageBackground(): Boolean =
+        !BrowserPreferences.getStartPageBackgroundUri(this).isNullOrBlank()
 
-        binding.startPageRoot.background = LayerDrawable(arrayOf(baseLayer, blobA, blobB, blobC))
-        cachedStartPageGradientSignature = signature
+    /**
+     * The dim overlay is now ONLY a legibility scrim for a user-set photo background — a balanced
+     * ~60% wash so the photo is "not too dark and not too light". With no photo (the default brand
+     * home) it stays hidden so the electric-blue hero glow shows through.
+     */
+    private fun updateStartPageScrim() {
+        if (!::binding.isInitialized) return
+        val showScrim = hasStartPageBackground() && !isStartPagePhotoOnlyMode
+        if (showScrim) {
+            binding.startPageDimOverlay.setBackgroundColor(Color.parseColor("#99070B16"))
+        }
+        binding.startPageDimOverlay.visibility = if (showScrim) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Head units are landscape and wide: lay the hero out on the left and the media shelves on the
+     * right. On a phone (portrait / narrow) the two panes stack vertically and scroll.
+     */
+    private fun applyStartPageColumnsOrientation() {
+        if (!::binding.isInitialized) return
+        val columns = binding.startPageColumns
+        val hero = binding.startPageHeroPane
+        val shelf = binding.startPageShelfPane
+        val cfg = resources.configuration
+        val wide = cfg.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
+            cfg.screenWidthDp >= 600
+        val density = resources.displayMetrics.density
+        if (wide) {
+            columns.orientation = LinearLayout.HORIZONTAL
+            hero.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.05f)
+            shelf.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+            hero.setPadding(0, 0, (22 * density).toInt(), 0)
+        } else {
+            columns.orientation = LinearLayout.VERTICAL
+            hero.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            shelf.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (28 * density).toInt() }
+            hero.setPadding(0, 0, 0, 0)
+        }
+    }
+
+    /** "Continue" row: real last-visited page only (no history store yet); hidden when empty. */
+    private fun refreshContinueWatching() {
+        if (!::binding.isInitialized) return
+        val container = binding.continueWatchingContainer
+        container.removeAllViews()
+        val lastUrl = BrowserPreferences.getLastVisitedUrl(this)
+        val show = !lastUrl.isNullOrBlank()
+        binding.continueWatchingLabel.visibility = if (show) View.VISIBLE else View.GONE
+        container.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) container.addView(createContinueChip(lastUrl!!))
+    }
+
+    private fun createContinueChip(url: String): View {
+        val density = resources.displayMetrics.density
+        fun dp(v: Float) = (v * density).toInt()
+        return com.google.android.material.card.MaterialCardView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(60f))
+            radius = 16 * density
+            strokeWidth = dp(1f)
+            strokeColor = android.graphics.Color.parseColor("#1B2030")
+            setCardBackgroundColor(android.graphics.Color.parseColor("#0C1017"))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { loadUrlFromIntent(url) }
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(10f), dp(8f), dp(18f), dp(8f))
+                addView(
+                    createSiteIconBadge(
+                        url = url,
+                        sizeDp = 40f,
+                        cornerRadiusDp = 11f,
+                        paddingDp = 7f,
+                        backgroundColor = android.graphics.Color.WHITE,
+                        showAddOnEmptyUrl = false
+                    )
+                )
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { marginStart = dp(12f) }
+                    addView(MaterialTextView(this@MainActivity).apply {
+                        text = displayTitleForUrl(url)
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.END
+                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+                        setTextColor(android.graphics.Color.parseColor("#F2F5FB"))
+                    })
+                    addView(MaterialTextView(this@MainActivity).apply {
+                        text = getString(R.string.start_page_resume_last_page)
+                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                        setTextColor(android.graphics.Color.parseColor("#8993A6"))
+                    })
+                })
+            })
+        }
     }
 
     private fun decodeSampledBitmapFromUri(uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
@@ -2713,7 +2799,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshStartPageResumeButton() {
-        binding.buttonStartPageResume.isVisible = !BrowserPreferences.getLastVisitedUrl(this).isNullOrBlank()
+        // Superseded by the "Continue" chip in the shelf pane (refreshContinueWatching);
+        // keep the legacy button hidden so resume isn't duplicated on the hero.
+        binding.buttonStartPageResume.isVisible = false
     }
 
     private fun handleStartPageBackgroundPicked(uri: Uri?) {
