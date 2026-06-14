@@ -1358,44 +1358,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun applyStartPageDonateTab(isGithub: Boolean) {
-            if (isGithub) {
-                binding.startPageDonateAddress.text = START_PAGE_SPONSOR_URL
-                val qrBitmap = generateQrCode(START_PAGE_SPONSOR_URL)
-                if (qrBitmap != null) {
-                    binding.startPageDonateQrImage.setImageBitmap(qrBitmap)
-                } else {
-                    binding.startPageDonateQrImage.setImageResource(R.drawable.ic_github)
-                }
-                binding.startPageDonateActionButton.text = getString(R.string.settings_donate_open_github_sponsors)
-                binding.startPageDonateActionButton.setIconResource(R.drawable.favorite_24px)
-                binding.startPageDonateActionButton.iconTint = ColorStateList.valueOf(Color.parseColor("#EC407A"))
-                binding.startPageDonateActionButton.setOnClickListener {
-                    openUriExternally(Uri.parse(START_PAGE_SPONSOR_URL))
-                }
-            } else {
-                binding.startPageDonateAddress.text = getString(R.string.donate_bitcoin_address_value)
-                binding.startPageDonateQrImage.setImageResource(R.drawable.bitcoin_qr)
-                binding.startPageDonateActionButton.text = getString(R.string.donate_copy)
-                binding.startPageDonateActionButton.setIconResource(R.drawable.content_copy_24px)
-                binding.startPageDonateActionButton.iconTint = ColorStateList.valueOf(
-                    resolveThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
-                binding.startPageDonateActionButton.setOnClickListener {
-                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Bitcoin Address", binding.startPageDonateAddress.text.toString()))
-                    Toast.makeText(this, R.string.donate_copied, Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
-        binding.startPageDonateTabGroup.check(binding.startPageDonateTabGithub.id)
-        applyStartPageDonateTab(isGithub = true)
-        binding.startPageDonateTabGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            applyStartPageDonateTab(isGithub = checkedId == binding.startPageDonateTabGithub.id)
-        }
-
         binding.persistentButtonMenu.setOnClickListener { showMenuOverlay() }
         binding.menuFab.setOnClickListener { handleQuickActionButtonPressed() }
         setupBottomControlBar()

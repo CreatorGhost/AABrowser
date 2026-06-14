@@ -17,8 +17,8 @@ android {
         applicationId = "com.driftway.browser"
         minSdk = 35
         targetSdk = 36
-        versionCode = 12
-        versionName = "2.2-beta1"
+        versionCode = 14
+        versionName = "2.2-beta3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

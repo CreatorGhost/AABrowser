@@ -159,18 +159,7 @@
     <string name="settings_clear_cookies_success_title">Cookies and site data deleted</string>
     <string name="settings_clear_cookies_success_message">Stored cookies, local site data, and saved form data have been deleted from the browser.</string>
     
-    <string name="settings_donate">Donate</string>
-    <string name="settings_donate_description">If you find this app useful, please consider supporting me with a donation. It really fuels my motivation to keep improving it!</string>
-    <string name="settings_donate_tab_github">GitHub Sponsors</string>
-    <string name="settings_donate_tab_bitcoin">Bitcoin</string>
-    <string name="settings_donate_open_github_sponsors">Open Sponsors Page</string>
-    <string name="donate_bitcoin_address">Bitcoin Address</string>
-    <string name="donate_bitcoin_address_value">bc1qnpqpfq7e8pjtlqj7aa6x2y2c9ctnpts5u9lx7v</string>
-    <string name="donate_copy">Copy</string>
-    <string name="donate_copied">Address copied to clipboard</string>
 
-    <string name="settings_donors">Donors</string>
-    <string name="settings_donors_description">No donations yet😢</string>
     
     <string name="settings_license">License</string>
     <string name="settings_license_description">This application and its source code are licensed under the GNU General Public License version 3 (GPLv3). If you incorporate this application or use any of its code, you must include clear attribution to the repository: https://github.com/kododake/AABrowser</string>
@@ -181,8 +170,6 @@
     <string name="open_source_view_licenses">View open-source licenses</string>
     <string name="open_source_licenses_title">Open-source Licenses</string>
     
-    <string name="sponsors_title">Sponsors</string>
-    <string name="sponsors_none_text">This project currently has no sponsors. Donations are welcome — thank you for your support!</string>
     
     <string name="kododake_name">kododake (Lead)</string>
     <string name="menu_start_page">Start Page</string>
