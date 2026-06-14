@@ -664,6 +664,13 @@
                                         app:icon="@drawable/share" />
 
                                     <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonReadAloud"
+                                        style="@style/Widget.Driftway.MenuRow"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/menu_read_aloud"
+                                        app:icon="@drawable/mic_24px" />
+
+                                    <com.google.android.material.button.MaterialButton
                                         android:id="@+id/buttonSettings"
                                         style="@style/Widget.Driftway.MenuRow"
                                         android:layout_height="wrap_content"

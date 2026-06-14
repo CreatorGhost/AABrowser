@@ -310,6 +310,9 @@ object SettingsViews {
         themeGroup.addView(autoThemeButton)
         themeGroup.addView(lightThemeButton)
         themeGroup.addView(darkThemeButton)
+        // Driftway is locked to AMOLED-dark — the selector is inert, so keep it hidden. (Wiring
+        // kept below so the stored pref + callbacks stay consistent.)
+        themeGroup.visibility = View.GONE
         appearanceInner.addView(themeGroup)
 
         when (themeMode) {

@@ -105,8 +105,19 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             handleStartPageBackgroundPicked(uri)
         }
+    private val voiceSearchLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val spoken = result.data
+                    ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull()
+                    ?.trim()
+                if (!spoken.isNullOrBlank()) loadUrlFromIntent(spoken)
+            }
+        }
 
     private var webView: android.webkit.WebView? = null
+    private var tts: android.speech.tts.TextToSpeech? = null
     private var currentUrl: String = ""
     private var currentPageTitle: String = ""
     private var currentUserAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
@@ -286,6 +297,7 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(autoHideMenuFab)
         handler.removeCallbacks(showMenuFabRunnable)
         exitFullscreen()
+        tts?.stop(); tts?.shutdown(); tts = null
         loadedStartPageBackgroundBitmap?.recycle()
         loadedStartPageBackgroundBitmap = null
         loadedStartPageBackgroundUri = null
@@ -1332,10 +1344,11 @@ class MainActivity : AppCompatActivity() {
             hideMenuOverlay()
         }
         binding.buttonSettings.setOnClickListener { showSettingsView() }
+        binding.buttonReadAloud.setOnClickListener { hideMenuOverlay(); toggleReadAloud() }
         // Cinematic hero search pill → open the address entry. (Mic = voice search is a tracked
         // follow-up; for now it also opens the address field so the affordance works.)
         binding.startPageSearchPill.setOnClickListener { showMenuOverlay(focusAddressBar = true) }
-        binding.startPageMic.setOnClickListener { showMenuOverlay(focusAddressBar = true) }
+        binding.startPageMic.setOnClickListener { launchVoiceSearch() }
         binding.buttonStartPageResume.setOnClickListener {
             val resumeUrl = BrowserPreferences.getLastVisitedUrl(this)
             if (resumeUrl.isNullOrBlank()) {
@@ -1695,6 +1708,65 @@ class MainActivity : AppCompatActivity() {
         val navigable = BrowserPreferences.formatNavigableUrl(rawUrl.trim())
         if (navigable.isEmpty()) return
         navigateActiveTabTo(navigable, closeMenuAfterNavigate = true)
+    }
+
+    /** Home mic → system speech recognizer → load the spoken text (URL or search). */
+    private fun launchVoiceSearch() {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, getString(R.string.start_page_voice_search))
+        }
+        try {
+            voiceSearchLauncher.launch(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            // No on-device speech service — fall back to the keyboard address entry.
+            showMenuOverlay(focusAddressBar = true)
+            Toast.makeText(this, R.string.voice_search_unavailable, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Read-Aloud: toggle TTS of the current page's readable text (audio survives backgrounding). */
+    private fun toggleReadAloud() {
+        tts?.let { if (it.isSpeaking) { it.stop(); Toast.makeText(this, R.string.read_aloud_stop, Toast.LENGTH_SHORT).show(); return } }
+        val target = webView ?: return
+        target.evaluateJavascript(
+            "(function(){var t=(document.body&&document.body.innerText)||'';return t.replace(/\\s+/g,' ').trim();})()"
+        ) { raw ->
+            val text = runCatching { org.json.JSONTokener(raw).nextValue() as? String }.getOrNull().orEmpty()
+            if (text.isBlank()) {
+                Toast.makeText(this, R.string.read_aloud_nothing, Toast.LENGTH_SHORT).show()
+            } else {
+                speakText(text)
+            }
+        }
+    }
+
+    private fun speakText(text: String) {
+        val existing = tts
+        if (existing != null) { enqueueSpeech(existing, text); return }
+        tts = android.speech.tts.TextToSpeech(this) { status ->
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                tts?.let { enqueueSpeech(it, text) }
+            } else {
+                runOnUiThread { Toast.makeText(this, R.string.voice_search_unavailable, Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+
+    private fun enqueueSpeech(engine: android.speech.tts.TextToSpeech, text: String) {
+        // TTS caps each utterance (~4000 chars) — speak the article in chunks.
+        val max = 3500
+        var i = 0
+        while (i < text.length) {
+            val end = minOf(i + max, text.length)
+            val queueMode = if (i == 0) android.speech.tts.TextToSpeech.QUEUE_FLUSH
+                            else android.speech.tts.TextToSpeech.QUEUE_ADD
+            engine.speak(text.substring(i, end), queueMode, null, "driftway_$i")
+            i = end
+        }
     }
 
     private fun updateNavigationButtons() {
