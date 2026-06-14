@@ -153,5 +153,22 @@ class MediaPlaybackBridge(
               };
             })();
         """.trimIndent()
+
+        // Spoof the Page Visibility API. Backgrounding the app (driving, screen-off, the car host
+        // hiding the UI) sets document.hidden=true, and YouTube/Netflix/Twitch players listen for
+        // that and AUTO-PAUSE — which is exactly why audio "stops as soon as the car starts".
+        // Keeping the page reported as visible lets background audio keep playing. Injected early
+        // (onPageStarted) so it runs before the site's player reads visibility.
+        val VISIBILITY_SPOOF_JS = """
+            (function(){
+              if (window.__aaVisInit) return; window.__aaVisInit = true;
+              function def(o,p,v){ try { Object.defineProperty(o,p,{configurable:true,get:function(){return v;}}); } catch(e){} }
+              def(document,'hidden',false); def(document,'webkitHidden',false);
+              def(document,'visibilityState','visible'); def(document,'webkitVisibilityState','visible');
+              function swallow(e){ e.stopImmediatePropagation(); }
+              document.addEventListener('visibilitychange', swallow, true);
+              document.addEventListener('webkitvisibilitychange', swallow, true);
+            })();
+        """.trimIndent()
     }
 }

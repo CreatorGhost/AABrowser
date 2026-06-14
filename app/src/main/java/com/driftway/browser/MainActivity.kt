@@ -1895,6 +1895,10 @@ class MainActivity : AppCompatActivity() {
             bringToFront()
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Make the whole fullscreen frame uniformly black: the transparent status bar otherwise
+        // shows the dark theme background as a lighter band at the top of the letterbox/cutout.
+        window.statusBarColor = Color.BLACK
+        window.navigationBarColor = Color.BLACK
         // Use one consistent inset-controller target (root) for enter/exit, and let a stray
         // touch only reveal the bars transiently (swipe) instead of permanently breaking immersion.
         WindowInsetsControllerCompat(window, binding.root).apply {
@@ -1914,6 +1918,9 @@ class MainActivity : AppCompatActivity() {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         WindowInsetsControllerCompat(window, binding.root).show(WindowInsetsCompat.Type.systemBars())
+        // Restore the normal bar colors (fullscreen forced them pure black).
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = resolveThemeColor(android.R.attr.colorBackground)
         val callback = customViewCallback
         customView = null
         customViewCallback = null
