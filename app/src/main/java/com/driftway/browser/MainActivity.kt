@@ -161,7 +161,9 @@ class MainActivity : AppCompatActivity() {
         if (BrowserPreferences.shouldUseSystemColors(this)) {
             DynamicColors.applyToActivityIfAvailable(this)
         }
-        AppCompatDelegate.setDefaultNightMode(BrowserPreferences.getThemeMode(this).nightMode)
+        // Driftway is an AMOLED-dark brand — the home and all chrome are designed dark. Lock the
+        // app to night mode so the curated dark UI can never render against a light system theme.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
         shouldForceSessionRestore = savedInstanceState != null
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -1864,6 +1866,7 @@ class MainActivity : AppCompatActivity() {
         if (!::binding.isInitialized) return
         val bar = binding.bottomControlBar
         if (!bar.isVisible) return
+        bar.animate().cancel() // avoid translationY drift if the user rapid-toggles the handle
         val dy = (bar.height.takeIf { it > 0 } ?: dpToPx(96)).toFloat()
         bar.animate().translationY(dy).alpha(0f).setDuration(160L)
             .setInterpolator(android.view.animation.AccelerateInterpolator())
