@@ -8,7 +8,7 @@
 
 | # | Capability | Old AA Browser (v2.0) | New build (v2.1-beta1) | Marketing hook |
 |---|-----------|------------------------|-------------------------|----------------|
-| 1 | **Audio while driving** | ❌ All media stops the instant the car moves (Activity stopped → WebView paused) | ✅ MediaSession + foreground service **decoupled from the Activity** keeps audio playing; lock-screen / steering-wheel transport controls; audio-focus aware (ducks for nav, pauses for calls) | **"Your music & podcasts keep playing when you start driving."** |
+| 1 | **Consent-gated video continuity** | ❌ Media/video can stop when the car host sends background lifecycle events | ✅ Active media WebView is preserved across lifecycle changes, with an explicit passenger/non-driver consent gate before real video playback | **"Passenger-confirmed video that does not get force-closed by the app."** |
 | 2 | **Ad / tracker / pop-up blocking** | ❌ None at all ("No Ad Blocking — contributions welcome") | ✅ Network blocking (EasyList/AdGuard/StevenBlack data) + cosmetic ad-slot hiding + Facebook in-feed hider + **pop-up/pop-under blocking** + opt-in SponsorBlock | **"Built-in ad, tracker & pop-up blocking — no setup."** |
 | 3 | **Premium look** | Generic stock Material 3; Material-You wallpaper **overrode** the brand colors; Holo-era icons | ✅ Curated brand + true-black AMOLED theme ships by default; system-bar contrast fixed. **(Next: full neon "Expressive Aurora" redesign.)** | **"A premium cockpit UI, not a stretched phone app."** |
 | 4 | **Streaming quality** | Mobile players, capped/restricted on Netflix/YT/Crunchyroll | ✅ Desktop players default on car/large displays → full-size player + better quality controls | **"Full-size video players, the way the site intended."** |
@@ -27,9 +27,10 @@
 
 ## Relaunch verdict
 
-**Relaunch-worthy — yes.** This is not a patch; it's three new capability pillars (driving audio,
-ad/pop-up blocking, premium identity) plus fixes to the old app's worst flaws. Feature #1 alone
-(audio that doesn't die when you drive) is a category-defining hook for a car browser.
+**Relaunch-worthy — yes.** This is not a patch; it's three new capability pillars
+(consent-gated video continuity, ad/pop-up blocking, premium identity) plus fixes to the old app's
+worst flaws. Feature #1 alone gives the browser a clear media promise: the app should not
+force-close passenger-confirmed video playback.
 
 **Recommended sequence:** ship the **Expressive Aurora** redesign (new neon visual identity) BEFORE
 the rename — so the new name arrives with a new *look*, not just new internals. Then rename +
@@ -43,7 +44,7 @@ relaunch with this table as the changelog/landing-page copy.
 - Per-site ad-block exceptions UI; "Manage exceptions" list
 - Picture-in-Picture + in-player large-target controls
 - New app name, icon, splash, start-page identity
-- (Investigate) AAOS `FEATURE_BACKGROUND_AUDIO_WHILE_DRIVING` for first-class background audio
+- Passenger/non-driver consent gate before real video playback starts or resumes; muted previews stay non-blocking
 
 ## How to test the current build
 See the chat / `docs/OPTIMIZATION_ROADMAP.md`. Short version: install the signed

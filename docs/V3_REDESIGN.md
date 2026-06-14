@@ -9,7 +9,7 @@ Lead: **Aurova** — ties directly to the neon "Aurora" identity, short, brandab
 Google echo. Alternates if you want a different feel:
 - **Nocturne** — cinematic true-black / night-drive vibe.
 - **Driftway** — road + flow; warmer, less techy.
-- **Idlecast** — playful wink at "parked + casting media".
+- **Idlecast** — playful wink at in-car casting media.
 
 *(Pick one; I'll verify trademark/Play/domain before locking. Everything below is name-agnostic.)*
 
@@ -34,11 +34,11 @@ Google echo. Alternates if you want a different feel:
 | 8 | **Motion** | None (instant cuts) | Spring/physics press feedback + fade/shared-axis panel transitions (short, calm) | "Smooth/premium" feel; calm = safe for a car | M |
 | 9 | **Icons** | Mixed; Holo `ic_menu_*` (fixed) | One coherent Material Symbols family, accent-tinted | Visual consistency | S |
 | 10 | **Tabs / bookmarks** | Plain rows, raw URLs (fixed→host) | Premium cards, logo-forward, tab-count badge | Glanceable, branded | M |
-| 11 | **Settings** | 12+ identical dense bordered cards, BodySmall | Grouped, larger rows/switches, "About" collapses the long tail | Usable while parked; less scrolling | M |
+| 11 | **Settings** | 12+ identical dense bordered cards, BodySmall | Grouped, larger rows/switches, "About" collapses the long tail | Less scrolling; clearer large-target controls | M |
 | 12 | **Menu** | Everything 2 taps deep in one sheet | Trimmed to genuine overflow (Bookmarks/Share/Settings/New Tab/QR); primary nav now on the bar | Common actions one tap; menu = long tail only | M |
-| 13 | **Flagship feature** | — | **Read-Aloud / Listen-to-Articles** (on-device TTS via the existing MediaSession) | The one premium feature usable WHILE DRIVING (audio); no rival has it | M |
+| 13 | **Flagship feature** | — | **Passenger-confirmed video continuity** plus Read-Aloud via the existing MediaSession | Video requires explicit passenger/non-driver consent, then should not be force-closed by app lifecycle code | M |
 | 14 | **Voice-first** | Speech bridge exists but buried | Large mic on the home/bar: "open YouTube", "search…", "go to…" | Avoids the laggy head-unit keyboard | S |
-| 15 | **Persistence defaults** | FAB + URL bar hidden by default; 3s auto-hide | Controls + URL/security bar visible by default; auto-hide only in fullscreen video | Screen space isn't scarce parked; persistence beats hunting | S |
+| 15 | **Persistence defaults** | FAB + URL bar hidden by default; 3s auto-hide | Controls + URL/security bar visible by default; auto-hide only in fullscreen video | Head-unit screens have room for persistent controls; persistence beats hunting | S |
 
 ## Build order (each step build-verified + emulator-checked; PRs wait for CodeRabbit)
 1. **Foundation theme**: neon AMOLED color identity + shape scale + type scale + fonts + icon family.
@@ -50,5 +50,6 @@ Google echo. Alternates if you want a different feel:
 7. Settings polish.
 
 ## Constraints kept honest (from prior research)
-- Driver video-in-motion stays blocked (platform); audio-while-driving is the durable win.
+- Video playback is passenger/non-driver consent-gated; the app must not present video as driver-facing.
+- External Android Auto/AAOS hosts may still enforce behavior outside the app process.
 - Widevine SD cap; YouTube ads not durably blockable. Sideload-only distribution.

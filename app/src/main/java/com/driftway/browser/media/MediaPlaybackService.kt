@@ -19,8 +19,8 @@ import com.driftway.browser.R
 
 /**
  * Foreground service that keeps the process alive (with a MediaStyle notification) while HTML5
- * media plays in the WebView, so audio continues when the app is backgrounded / the car host
- * hides the UI during driving. It owns no playback itself — it mirrors the [MediaSessionCompat]
+ * media plays in the WebView, so playback state and controls survive app/host lifecycle changes.
+ * It owns no playback itself — it mirrors the [MediaSessionCompat]
  * created by [MediaSessionController] and routes notification button taps back through the
  * session's transport controls (which the controller forwards into the page via JS).
  */

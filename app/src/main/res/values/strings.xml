@@ -90,7 +90,12 @@
     <string name="media_pause">Pause</string>
     <string name="media_stop">Stop</string>
     <string name="media_notification_channel">Media playback</string>
-    <string name="media_notification_channel_description">Shows playback controls and keeps audio playing in the background.</string>
+    <string name="media_notification_channel_description">Shows playback controls while media is active.</string>
+    <string name="video_consent_title">Passenger video confirmation</string>
+    <string name="video_consent_message">Video is not for the driver. If you are driving, do not continue. If you are a passenger or non-driver, tap Continue to watch.</string>
+    <string name="video_consent_site">Site: %1$s</string>
+    <string name="video_consent_continue">Continue as passenger</string>
+    <string name="video_consent_cancel">Cancel video</string>
     <string name="error_renderer_recovered">The page crashed and was reloaded.</string>
     <string name="settings_applies_after_playback">This will apply after media stops playing.</string>
     <string name="settings_display_scale">Display scale</string>
@@ -185,7 +190,7 @@
     <string name="start_page_continue_label">Continue</string>
     <string name="start_page_ai_label">AI</string>
     <string name="start_page_headline">Let\'s roll.</string>
-    <string name="start_page_subtitle">Your media — parked &amp; ready.</string>
+    <string name="start_page_subtitle">Your media — ready to roll.</string>
     <string name="start_page_card_title">Jump back in</string>
     <string name="start_page_card_subtitle">Pin up to six sites from the bookmarks menu.</string>
     <string name="start_page_quick_links_hint">Open the bookmarks menu to add, reorder, or swap start page sites.</string>

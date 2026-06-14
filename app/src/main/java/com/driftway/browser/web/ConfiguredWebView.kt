@@ -179,9 +179,11 @@ fun configureWebView(
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 resetJsDialogGuardForNewPage()
-                // Keep background audio alive: spoof page visibility BEFORE the site's player
-                // initialises, so backgrounding (driving/screen-off) doesn't make it auto-pause.
+                // Keep media alive: spoof page visibility and install the consent/media bridge
+                // BEFORE the site's player initialises, so host lifecycle changes don't make it
+                // auto-pause and early play() calls can be consent-gated.
                 view.evaluateJavascript(MediaPlaybackBridge.VISIBILITY_SPOOF_JS, null)
+                view.evaluateJavascript(MediaPlaybackBridge.INJECTION_JS, null)
                 val stringUrl = url ?: return
                 val uri = Uri.parse(stringUrl)
                 val scheme = uri.scheme?.lowercase()

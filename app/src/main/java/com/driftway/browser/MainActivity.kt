@@ -149,6 +149,12 @@ class MainActivity : AppCompatActivity() {
     // Set on the binder thread the instant the page reports "playing", before the UI-thread
     // handler runs — closes the race where a transient onPause suspends the WebView mid-start.
     @Volatile private var mediaIntentActive: Boolean = false
+    @Volatile private var isVideoPlaybackConsentGranted: Boolean = false
+    private var pendingVideoConsentTabId: Long? = null
+    private var isVideoConsentDialogShowing: Boolean = false
+    private var videoConsentDialog: android.app.Dialog? = null
+    private var isConsentedVideoPlaying: Boolean = false
+    private var hasConsentedVideoPlaybackIntent: Boolean = false
     private var lastMediaTitle: String? = null
     private var lastMediaArtist: String? = null
     private var lastMediaDurationMs: Long = 0L
@@ -235,7 +241,9 @@ class MainActivity : AppCompatActivity() {
         // multi-window) onStop does NOT fire, so without this the WebView keeps decoding video
         // and running JS timers — wasting CPU/battery. Skip only when media should keep playing
         // (mediaIntentActive covers the race where "playing" hasn't reached the UI thread yet).
-        if (!hasActiveMediaSession && !mediaIntentActive) {
+        if (shouldPreserveConsentedVideoPlayback()) {
+            resumeConsentedVideoWebView()
+        } else if (!hasActiveMediaSession && !mediaIntentActive) {
             exitFullscreen()
             webView?.onPause()
         }
@@ -243,12 +251,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
-        // Always tear down fullscreen on true backgrounding so the custom-view + system-bar state
-        // can't be left stale. Keep the WebView itself running only when there's an active media
-        // session, so audio continues in the background / while driving (the foreground service
-        // keeps the process alive); the video surface is gone but audio — the legitimate part — survives.
-        exitFullscreen()
-        if (!hasActiveMediaSession && !mediaIntentActive) {
+        // Preserve consented passenger video across car-host lifecycle changes. Non-video media
+        // still keeps the WebView process/session alive, but fullscreen video surfaces are only
+        // kept attached after explicit passenger/non-driver confirmation.
+        val preserveConsentedVideo = shouldPreserveConsentedVideoPlayback()
+        if (preserveConsentedVideo) {
+            resumeConsentedVideoWebView()
+        } else {
+            exitFullscreen()
+        }
+        if (!preserveConsentedVideo && !hasActiveMediaSession && !mediaIntentActive) {
             webView?.onPause()
         }
         super.onStop()
@@ -296,6 +308,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(autoHideMenuFab)
         handler.removeCallbacks(showMenuFabRunnable)
+        videoConsentDialog?.dismiss()
+        videoConsentDialog = null
         exitFullscreen()
         tts?.stop(); tts?.shutdown(); tts = null
         loadedStartPageBackgroundBitmap?.recycle()
@@ -731,16 +745,21 @@ class MainActivity : AppCompatActivity() {
         val speechBridge = com.driftway.browser.web.SpeechRecognitionBridge(tabView) { pageUrl ->
             requestSpeechRecognitionMicrophoneAccess(tab.id, pageUrl)
         }
-        val mediaBridge = MediaPlaybackBridge { state ->
-            // Set the intent flag synchronously on the binder thread BEFORE posting to the UI
-            // thread — so a transient onPause that fires before the posted Runnable runs still
-            // sees that media is (about to be) active and won't suspend the WebView mid-start.
-            when (state.state) {
-                "playing" -> mediaIntentActive = true
-                "stopped" -> mediaIntentActive = false
+        val mediaBridge = MediaPlaybackBridge(
+            onState = { state ->
+                // Set the intent flag synchronously on the binder thread BEFORE posting to the UI
+                // thread — so a transient onPause that fires before the posted Runnable runs still
+                // sees that media is (about to be) active and won't suspend the WebView mid-start.
+                when (state.state) {
+                    "playing" -> mediaIntentActive = !state.isVideo || isVideoPlaybackConsentGranted
+                    "stopped" -> mediaIntentActive = false
+                }
+                runOnUiThread { handleMediaState(tab.id, state) }
+            },
+            onVideoConsentRequested = { request ->
+                runOnUiThread { handleVideoConsentRequest(tab.id, request) }
             }
-            runOnUiThread { handleMediaState(tab.id, state) }
-        }
+        )
         tab = BrowserTab(
             id = nextTabId++,
             webView = tabView,
@@ -808,6 +827,7 @@ class MainActivity : AppCompatActivity() {
             onUrlChange = { url ->
                 runOnUiThread {
                     tab.currentUrl = url
+                    syncVideoConsentToTab(tab)
                     BrowserPreferences.persistUrl(this, url)
                     prefetchSiteIcon(url)
                     persistTabSession()
@@ -920,7 +940,13 @@ class MainActivity : AppCompatActivity() {
             isMediaPlaying = false
             hasActiveMediaSession = false
             mediaIntentActive = false
+            isConsentedVideoPlaying = false
+            hasConsentedVideoPlaybackIntent = false
             mediaController?.onPlaybackStopped()
+        }
+        if (pendingVideoConsentTabId == tab.id) {
+            cancelVideoConsentForTab(tab.id)
+            videoConsentDialog?.dismiss()
         }
         closeTab(tab.id)
         if (lastUrl != null) {
@@ -1029,16 +1055,23 @@ class MainActivity : AppCompatActivity() {
         val tabIndex = browserTabs.indexOfFirst { it.id == tabId }
         if (tabIndex < 0) return
 
-        val removedTab = browserTabs.removeAt(tabIndex)
+        val removedTab = browserTabs[tabIndex]
         if (pendingSpeechBridgeTabId == removedTab.id) {
             pendingSpeechBridgeTabId = null
         }
+        if (pendingVideoConsentTabId == removedTab.id) {
+            cancelVideoConsentForTab(removedTab.id)
+            videoConsentDialog?.dismiss()
+        }
+        browserTabs.removeAt(tabIndex)
         if (mediaPlayingTabId == removedTab.id) {
             // The tab that was playing is gone — tear down the media session/notification.
             mediaPlayingTabId = null
             isMediaPlaying = false
             hasActiveMediaSession = false
             mediaIntentActive = false
+            isConsentedVideoPlaying = false
+            hasConsentedVideoPlaybackIntent = false
             lastMediaTitle = null
             lastMediaArtist = null
             lastMediaDurationMs = 0L
@@ -2018,9 +2051,137 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun shouldPreserveConsentedVideoPlayback(): Boolean {
+        return isVideoPlaybackConsentGranted &&
+            (isConsentedVideoPlaying || hasConsentedVideoPlaybackIntent)
+    }
+
+    private fun resumeConsentedVideoWebView() {
+        val targetId = mediaPlayingTabId ?: pendingVideoConsentTabId ?: activeTabId
+        val target = browserTabs.firstOrNull { it.id == targetId }?.webView ?: return
+        target.onResume()
+        target.resumeTimers()
+    }
+
+    private fun syncVideoConsentToTab(tab: BrowserTab) {
+        if (!isVideoPlaybackConsentGranted) return
+        tab.webView.evaluateJavascript(MediaPlaybackBridge.markVideoConsentGrantedJs(), null)
+    }
+
+    private fun handleVideoConsentRequest(
+        tabId: Long,
+        request: MediaPlaybackBridge.VideoConsentRequest
+    ) {
+        if (browserTabs.none { it.id == tabId }) return
+
+        if (isVideoPlaybackConsentGranted) {
+            grantVideoConsentForTab(tabId)
+            return
+        }
+
+        if (isFinishing || isDestroyed) {
+            cancelVideoConsentForTab(tabId)
+            return
+        }
+
+        if (isVideoConsentDialogShowing) {
+            if (pendingVideoConsentTabId != tabId) cancelVideoConsentForTab(tabId)
+            return
+        }
+
+        pendingVideoConsentTabId = tabId
+        showPassengerVideoConsentDialog(tabId, request)
+    }
+
+    private fun showPassengerVideoConsentDialog(
+        tabId: Long,
+        request: MediaPlaybackBridge.VideoConsentRequest
+    ) {
+        val siteLabel = browserTabs.firstOrNull { it.id == tabId }
+            ?.let { tab -> tab.webView.url ?: tab.currentUrl }
+            ?.takeIf { it.isNotBlank() }
+            ?.let { url -> runCatching { Uri.parse(url).host }.getOrNull() ?: url }
+            ?.takeIf { it.isNotBlank() }
+        val message = buildString {
+            append(getString(R.string.video_consent_message))
+            if (siteLabel != null) {
+                append("\n\n")
+                append(getString(R.string.video_consent_site, siteLabel))
+            }
+        }
+
+        var handled = false
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(
+            this,
+            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
+        )
+            .setTitle(R.string.video_consent_title)
+            .setMessage(message)
+            .setNegativeButton(R.string.video_consent_cancel) { _, _ ->
+                handled = true
+                cancelVideoConsentForTab(tabId)
+            }
+            .setPositiveButton(R.string.video_consent_continue) { _, _ ->
+                handled = true
+                grantVideoConsentForTab(tabId)
+            }
+            .create()
+
+        isVideoConsentDialogShowing = true
+        videoConsentDialog = dialog
+        dialog.setCanceledOnTouchOutside(false)
+        dialog.setCancelable(false)
+        dialog.setOnDismissListener {
+            isVideoConsentDialogShowing = false
+            videoConsentDialog = null
+            if (!handled) cancelVideoConsentForTab(tabId)
+        }
+
+        runCatching {
+            dialog.show()
+            val width = (resources.displayMetrics.widthPixels * 0.9).toInt()
+            dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+        }.onFailure {
+            isVideoConsentDialogShowing = false
+            videoConsentDialog = null
+            cancelVideoConsentForTab(tabId)
+        }
+    }
+
+    private fun grantVideoConsentForTab(tabId: Long) {
+        val target = browserTabs.firstOrNull { it.id == tabId }?.webView
+        if (target == null) {
+            if (pendingVideoConsentTabId == tabId) pendingVideoConsentTabId = null
+            hasConsentedVideoPlaybackIntent = false
+            return
+        }
+        isVideoPlaybackConsentGranted = true
+        pendingVideoConsentTabId = null
+        hasConsentedVideoPlaybackIntent = true
+        target.onResume()
+        target.resumeTimers()
+        target.evaluateJavascript(MediaPlaybackBridge.grantVideoConsentJs(), null)
+        handler.postDelayed({
+            if (!isConsentedVideoPlaying) hasConsentedVideoPlaybackIntent = false
+        }, VIDEO_CONSENT_START_GRACE_MS)
+    }
+
+    private fun cancelVideoConsentForTab(tabId: Long) {
+        if (pendingVideoConsentTabId == tabId) pendingVideoConsentTabId = null
+        if (!isVideoPlaybackConsentGranted) {
+            mediaIntentActive = false
+            hasConsentedVideoPlaybackIntent = false
+            isConsentedVideoPlaying = false
+        }
+        runCatching {
+            browserTabs.firstOrNull { it.id == tabId }?.webView
+                ?.evaluateJavascript(MediaPlaybackBridge.cancelVideoConsentJs(), null)
+        }
+    }
+
     /**
      * Creates the media session whose transport callbacks are routed back into the active
-     * media tab's page via JS, so HTML5 audio keeps playing in the background / while driving.
+     * media tab's page via JS, so HTML5 media controls survive host lifecycle changes.
      */
     private fun setupMediaSession() {
         mediaController = MediaSessionController(
@@ -2054,6 +2215,20 @@ class MainActivity : AppCompatActivity() {
         val controller = mediaController ?: return
         when (state.state) {
             "playing" -> {
+                if (state.isVideo && !isVideoPlaybackConsentGranted) {
+                    mediaIntentActive = false
+                    browserTabs.firstOrNull { it.id == tabId }?.webView
+                        ?.evaluateJavascript(MediaPlaybackBridge.pauseJs(), null)
+                    handleVideoConsentRequest(
+                        tabId,
+                        MediaPlaybackBridge.VideoConsentRequest(
+                            reason = "playing-state",
+                            title = state.title,
+                            host = state.artist
+                        )
+                    )
+                    return
+                }
                 mediaIntentActive = true
                 // Ownership guard: don't let a background tab's 5s heartbeat steal transport
                 // ownership from the tab the user is actually controlling.
@@ -2069,6 +2244,13 @@ class MainActivity : AppCompatActivity() {
                 // arrived (lifecycle race), resume it so playback isn't left frozen.
                 browserTabs.firstOrNull { it.id == tabId }?.webView?.apply {
                     onResume(); resumeTimers()
+                }
+                if (state.isVideo && isVideoPlaybackConsentGranted) {
+                    isConsentedVideoPlaying = true
+                    hasConsentedVideoPlaybackIntent = false
+                } else if (!state.isVideo) {
+                    isConsentedVideoPlaying = false
+                    hasConsentedVideoPlaybackIntent = false
                 }
                 // Only push metadata on an actual track change (avoids a notification rebuild
                 // every 5s heartbeat); the steady tick just refreshes playback position.
@@ -2097,6 +2279,10 @@ class MainActivity : AppCompatActivity() {
             "paused" -> {
                 if (tabId != mediaPlayingTabId) return
                 isMediaPlaying = false
+                if (state.isVideo || isConsentedVideoPlaying) {
+                    isConsentedVideoPlaying = false
+                    hasConsentedVideoPlaybackIntent = false
+                }
                 controller.onPlaybackPaused(state.positionMs)
                 // Always release the screen-awake flag when playback stops advancing — keeping it
                 // set in fullscreen would defeat the "screen-on tied to playback" behavior and
@@ -2108,6 +2294,8 @@ class MainActivity : AppCompatActivity() {
                 isMediaPlaying = false
                 hasActiveMediaSession = false
                 mediaIntentActive = false
+                isConsentedVideoPlaying = false
+                hasConsentedVideoPlaybackIntent = false
                 mediaPlayingTabId = null
                 lastMediaTitle = null
                 lastMediaArtist = null
@@ -3184,6 +3372,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val MENU_BUTTON_AUTO_HIDE_DELAY_MS = 3000L
         private const val MENU_BUTTON_SHOW_DELAY_MS = 500L
+        private const val VIDEO_CONSENT_START_GRACE_MS = 15_000L
         private const val ERROR_PAGE_ASSET_PREFIX = "file:///android_asset/error.html"
         private const val GITHUB_REPO_URL = "https://github.com/CreatorGhost/Driftway"
         // TODO(owner): set to your own sponsor/donate URL. Donate UI is removed in the relaunch;

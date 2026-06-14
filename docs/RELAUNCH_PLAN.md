@@ -17,7 +17,7 @@
 | 3 Control bar (swipe-up) | ⛔ not done (next priority) |
 | 4 Pre-launch fixes | ⚠️ partial — home fixes done; **notification-perm deferral + menu ≥16sp legibility + full photo-feature code removal still pending** |
 | 5 Signed release build | ✅ done — `Driftway-2.2-beta1.apk`, verified signed |
-| 6 Thorough emulator test | ✅ functional pass — launches/responsive, branded home both orientations, browsing (example.com + YouTube), no crashes. **Deep press-play audio playback = unchanged media code from the verified audio-focus fix; confirm on your phone.** |
+| 6 Thorough emulator test | ✅ functional pass — launches/responsive, branded home both orientations, browsing (example.com + YouTube), no crashes. **Deep press-play media continuity = unchanged media code from the verified playback fix; confirm on your phone.** |
 | 7 Rename repo + publish | ✅ done — repo = CreatorGhost/Driftway; release published; updater `/releases/latest` resolves it |
 
 **Verified:** published signed APK installs + launches; in-app updater will detect v2.2-beta1.
@@ -57,8 +57,9 @@ Stage 4  Pre-launch audit fixes: defer notification permission until first playb
             light-theme surfaces (keep the home hero intentionally cinematic-dark)
 Stage 5  Adversarial review workflow → fix → build SIGNED release APK (Driftway 2.2-beta1)
 Stage 6  ★ THOROUGH EMULATOR TEST (MANDATORY before release is announced) ★
-            - Video playback: open YouTube, press play, confirm it KEEPS playing (the
-              play-then-stop regression) for ≥30s; check audio continues in background.
+            - Video playback: open YouTube, press play, confirm passenger/non-driver
+              consent appears, then confirm playback KEEPS playing for >=30s and through
+              lifecycle interruptions.
             - Pop-up / ad handling: visit an ad-heavy / sketchy site, confirm pop-ups &
               pop-unders are blocked and no dialog spam; SponsorBlock if enabled.
             - Navigation: address bar, search, back/forward, tabs (open/close/switch),

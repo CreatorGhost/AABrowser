@@ -9,12 +9,12 @@ import android.support.v4.media.session.PlaybackStateCompat
 
 /**
  * Owns the app's [MediaSessionCompat] and audio focus so HTML5 media playing in the WebView can
- * keep playing when the app is backgrounded — including when driving starts and the car host
- * hides the UI. The session is intentionally decoupled from any single WebView/tab: playback
+ * keep playing when the app receives host lifecycle changes, including car-host interruptions.
+ * The session is intentionally decoupled from any single WebView/tab: playback
  * lives in the page, and native transport actions are routed back to the page via [callback].
  *
- * Per the Android Auto driver-distraction model, video frames must stop while moving but AUDIO
- * may continue (the YouTube Music / Spotify model). This controller is what makes that possible.
+ * Passenger/non-driver video consent is handled above this layer. This controller only mirrors
+ * playback state and transport controls; it should not decide whether video is visible.
  */
 class MediaSessionController(
     private val context: Context,

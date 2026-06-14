@@ -98,7 +98,7 @@
 | ID | St | Item | Sev | Eff | Imp | Notes |
 |----|----|------|-----|-----|-----|-------|
 | V1 | [ ] | Default/per-host desktop UA for streaming sites (covered partly by Q3) | high | small | high | |
-| V2 | [x] | MediaSession + AudioFocus + foreground media service (background audio, controls) | high | medium | high | ✅ `media/MediaSessionController` + `media/MediaPlaybackService` + `web/MediaPlaybackBridge` (JS detects HTML5 media + navigator.mediaSession). build green. **This is the "keep YouTube AUDIO playing while driving" feature.** |
+| V2 | [x] | MediaSession + foreground media service (media continuity, controls) | high | medium | high | ✅ `media/MediaSessionController` + `media/MediaPlaybackService` + `web/MediaPlaybackBridge` (JS detects HTML5 media + navigator.mediaSession). build green. This is the base media-continuity layer. |
 | V3 | [x] | Don't pause active tab's media on tab-switch/background | high | medium | high | ✅ `onStop` skips `webView.onPause()` when `isMediaPlaying`; `switchToTab` won't pause the media tab; `closeTab` tears down session |
 | V4 | [x] | Fullscreen hardening: teardown moved `onPause`→`onStop`; BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; opaque black bg; consistent inset target (root) | med | medium | med | ✅ build green. Skipped forced landscape lock (head unit is fixed-landscape; forcing orientation risks fighting the projection surface) |
 | V5 | [ ] | App-level large in-player controls + visible exit affordance | low | medium | med | |
@@ -106,6 +106,7 @@
 | V7 | [x] | `offscreenPreRaster` active tab only | med | small | med | ✅ default off in `configureWebView`; toggled on for active tab in `switchToTab`. build green |
 | V8 | [ ] | Surface System WebView version + update prompt | low | small | med | |
 | V9 | [x] | Keep-screen-on during inline playback (not just fullscreen) | low | trivial | low | ✅ tied to media playback state in `handleMediaState` (guards against clobbering fullscreen) |
+| V10 | [x] | Passenger/non-driver consent gate before video playback | high | medium | high | Implemented in `MediaPlaybackBridge` + `MainActivity`: gates real video playback, ignores muted previews, and preserves consented video across lifecycle transitions. |
 | V0 | [!] | Widevine L1/HD — **HARD PLATFORM LIMIT** inside `android.webkit`; document, don't promise | med | large | med | Netflix ~480p, Crunchyroll ~720p |
 
 ---
@@ -190,7 +191,7 @@
 - Real elevation ladder (tonal surface steps + soft shadows) instead of 0dp flat cards
 - One quiet motion vocabulary (`dynamicanimation` SpringAnimation + MaterialContainerTransform, 150-250ms)
 - Bento-tile start page (reuse existing gradient + dim-overlay assets)
-- Keep AMOLED true-black night; enforce 76dp targets + ≥23dp spacing; gate text entry to parked state
+- Keep AMOLED true-black night; enforce 76dp targets + >=23dp spacing; gate video playback behind passenger/non-driver consent
 
 ---
 
@@ -211,7 +212,7 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
 | SF4 | [x] | Per-5s-tick metadata alloc + double notification rebuild | metadata pushed only on track change (cache in MainActivity + controller early-return) |
 | SF5 | [x] | QR encode ARGB_8888 | switched to `RGB_565` (half memory); + sponsor cache. (async off-thread = follow-up) |
 | SF7 | [x] | Analytics default-on (opt-out) w/ persistent UUID | flipped to **opt-in** (default off) |
-| SF6 | [ ] | Desktop-UA on ≥480dp + autoplay distraction risk | **DEFERRED**: kept desktop-UA default (serves user's video goal); follow-up = CarUxRestrictions video gating while driving |
+| SF6 | [ ] | Desktop-UA on >=480dp + autoplay distraction risk | **DEFERRED**: kept desktop-UA default (serves user's video goal); follow-up = passenger/non-driver consent gate before video playback |
 | NTH | [x] | Null `mediaController` before `release()` | done. (other nice-to-haves deferred) |
 
 ## Decisions log
@@ -229,13 +230,12 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
   Fallback was Cockpit Noir. → Sprint A is the implementation plan. **Open: accent color
   (amber-coral #D47C45-ish vs teal #1B5A66-ish) — confirm with user before A4.**
 - **2026-06-13** — Quick Wins batch (Q1-Q9) implemented on `feat/quick-wins-batch`; build green.
-- **2026-06-13** — Video Chunk 1 (V4, V7) + Chunk 2 (V2, V3, V9 = audio continuity) done, build green.
+- **2026-06-13** — Video Chunk 1 (V4, V7) + Chunk 2 (V2, V3, V9 = media continuity) done, build green.
   Added `androidx.media:media:1.7.0`, foreground `mediaPlayback` service + perms.
-- **2026-06-13** — Driving-audio research (`w86usyybp`): the video-in-motion stop is the car host
-  stopping/hiding the Activity → WebView lifecycle kills media. Legit fix = MediaSession +
-  foreground service decoupled from Activity (built). Driver VIDEO in motion = hard NHTSA/UX
-  safety lock (`UX_RESTRICTIONS_NO_VIDEO`), NOT bypassed. Follow-up: AAOS
-  `FEATURE_BACKGROUND_AUDIO_WHILE_DRIVING` opt-in beta worth investigating.
+- **2026-06-13** — Media continuity research (`w86usyybp`): the video stop is commonly triggered by
+  the car host stopping/hiding the Activity, which lets WebView lifecycle code kill media. Built the
+  MediaSession + foreground service base. New product direction: add a passenger/non-driver consent
+  gate, then preserve the active media WebView/fullscreen surface instead of force-closing video.
 - **2026-06-13** — Ad-block research (`w0qxe5ouj`): extensions impossible on android.webkit
   (would need GeckoView/Chromium fork → breaks Widevine). In-app layered blocker is the path.
   General web + FB feed achievable; YouTube ads NOT durably (SSAI). → Sprint AD; **awaiting user
@@ -255,7 +255,7 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
 
 ## Artifacts
 - Deep audit (49 findings, 8 agents): session task `wsm42ntc4`.
-- Design-directions research: `weq7064cz`. Driving-audio research: `w86usyybp`.
+- Design-directions research: `weq7064cz`. Media-continuity research: `w86usyybp`.
   Ad-block research: `w0qxe5ouj`. Quality gate: `wig3eqh4t`.
 - **Branch: `feat/ux-perf-video-audio`** (was `feat/quick-wins-batch`). Commit `4a510a9`.
 - **PR #1: https://github.com/CreatorGhost/AABrowser/pull/1** — quick wins + video sprint +
@@ -275,6 +275,6 @@ All confirmed findings fixed on `feat/quick-wins-batch`:
   accent on AMOLED black, with dark on-accent text for contrast. (A4 unblocked.)
 
 ## NEXT
-1. Test PR #1 on the head unit (audio-while-driving, OAuth popups, brand theme).
+1. Test PR #1 on the head unit (media continuity, OAuth popups, brand theme).
 2. Sprint AD (in progress on `feat/adblock-stable`): stable-tier ad blocking.
 3. Sprint A (Expressive Aurora, neon cyan) after ad-block.

@@ -5,7 +5,7 @@
 [<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkododake%2FAABrowser%22%2C%22author%22%3A%22kododake%22%2C%22name%22%3A%22AABrowser%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D)
 
 **The ultimate WebView browser experience for Android Auto head units.**
-Transform your "parked time" with a sleek, modern browser designed specifically for the road.
+Transform in-car media with a sleek, modern browser designed specifically for head-unit displays.
 
 > [!CAUTION]
 > **Beware of Fake Websites**
@@ -29,7 +29,7 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 ## ✨ Features
 
 - 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
-- 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) — perfect for charging breaks or while parked in a "flat, boring desert world."
+- 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) with a clear passenger/non-driver consent gate before real playback; muted previews do not interrupt browsing.
 - 🎨 **Light + AMOLED Themes:** Switch between a bright light theme and a true-black AMOLED dark mode built for car displays.
 - 🌓 **Beta Dark Pages:** Optionally ask WebView to darken supported pages while the dark theme is active.
 - 🏠 **Home Page Or Start Page:** Launch straight into a custom home page, or use the start page dashboard when no home page is set.
@@ -58,8 +58,8 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 
 #### 🛑 Developer's Safety Request
 
-* **Driver's Duty:** If you're the one steering, **DO NOT LOOK AT THIS APP.** If you think your eyes might wander while driving, **uninstall it right now!** Seriously, your safety is my top priority.
-* **Passenger's Joy:** This app is for your passengers or for when you are safely parked.
+* **Driver's Duty:** If you're the one steering, **DO NOT WATCH VIDEO ON THIS APP.** Keep your eyes on the road and use audio/voice controls only.
+* **Passenger Consent:** Video playback must be confirmed by a passenger or non-driver before it starts. The consent prompt is part of the feature, not an optional warning.
 * **Legal Note:** I built the code, but the **GPLv3 license** means I am **NOT RESPONSIBLE** for your actions. Drive smart!
 
 ---
@@ -85,7 +85,7 @@ If the app fails to launch, try opening a non-Google Maps navigation app (such a
 ## ⚠️ Current Issues
 
 - 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
-- 🚗 **Stationary Use Only**
+- 🚘 **Host/OEM limits vary:** Driftway does not voluntarily close passenger-confirmed video playback, but external Android Auto / AAOS behavior can still vary by host and region.
 
 ---
 
