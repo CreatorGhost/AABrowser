@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">AABrowser</string>
-    <string name="app_credit">AABrowser — by Kododake</string>
+    <string name="app_name">Driftway</string>
+    <string name="app_credit">Driftway — based on AABrowser by Kododake</string>
     <string name="author_name">Kododake</string>
-    <string name="menu_title">AABrowser</string>
+    <string name="menu_title">Driftway</string>
     <string name="menu_close">Close</string>
     <string name="menu_address_label">Address or search</string>
     
@@ -71,9 +71,9 @@
     <string name="settings_beta_dark_pages">Beta: darken web pages</string>
     <string name="settings_beta_dark_pages_description">Uses WebView algorithmic darkening when available. Best results with dark mode enabled.</string>
     <string name="settings_use_system_colors">Use system colors</string>
-    <string name="settings_use_system_colors_description">Match the head unit\'s Material You wallpaper colors instead of the built-in AA Browser theme. Off keeps the curated brand and AMOLED look.</string>
+    <string name="settings_use_system_colors_description">Match the head unit\'s Material You wallpaper colors instead of the built-in Driftway theme. Off keeps the curated brand and AMOLED look.</string>
     <string name="settings_analytics">Send anonymous usage stats</string>
-    <string name="settings_analytics_description">Off by default. When on, sends an anonymous app-open count to help improve AA Browser. No browsing data is collected.</string>
+    <string name="settings_analytics_description">Off by default. When on, sends an anonymous app-open count to help improve Driftway. No browsing data is collected.</string>
     <string name="settings_adblock_title">Ad blocking</string>
     <string name="settings_adblock_description">Blocks ad and tracker requests across the web, hides leftover ad slots, and blocks pop-up/pop-under ads. Note: YouTube\'s own video ads cannot be reliably blocked.</string>
     <string name="settings_adblock_toggle">Block ads, trackers &amp; pop-ups</string>
@@ -137,7 +137,7 @@
     <string name="settings_start_page_choose_background">Choose background</string>
     <string name="settings_start_page_clear_background">Clear background</string>
     <string name="settings_user_agent">User agent</string>
-    <string name="settings_user_agent_description">Choose how AABrowser identifies itself when loading pages.</string>
+    <string name="settings_user_agent_description">Choose how Driftway identifies itself when loading pages.</string>
     <string name="settings_user_agent_android">Android Chrome (default)</string>
     <string name="settings_user_agent_android_subtitle">Mobile: Android Chrome. Desktop mode uses Windows Chrome UA.</string>
     <string name="settings_user_agent_safari">Safari (iOS/macOS)</string>

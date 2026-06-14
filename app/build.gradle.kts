@@ -10,15 +10,15 @@ plugins {
 }
 
 android {
-    namespace = "com.kododake.aabrowser"
+    namespace = "com.driftway.browser"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.kododake.aabrowser"
+        applicationId = "com.driftway.browser"
         minSdk = 35
         targetSdk = 36
-        versionCode = 11
-        versionName = "2.1-beta4"
+        versionCode = 12
+        versionName = "2.2-beta1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,7 +68,7 @@ android {
     androidComponents {
         onVariants { variant ->
             val vNameStr = android.defaultConfig.versionName ?: "unknown"
-            val appNameStr = "AABrowser"
+            val appNameStr = "Driftway"
             val isDebug = variant.buildType == "debug"
             val debugSuffixStr = if (isDebug) "_debug" else ""
 

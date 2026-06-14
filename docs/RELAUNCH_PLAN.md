@@ -7,38 +7,52 @@
 
 ## Decisions locked for this run (defaults — change any in the morning)
 
-| # | Decision | Choice | Why / reversible? |
+| # | Decision | Choice (FINAL, owner-confirmed 2026-06-14) | Notes |
 |---|----------|--------|-------------------|
-| D1 | App **name** | **Driftway** (label, menu title, all UI strings) | Locked earlier. |
-| D2 | **applicationId / package** (`com.kododake.aabrowser`) | **KEEP for now** (invisible to users); flip to `com.driftway.browser` later on your one-word go | Changing it orphans your current install + is the riskiest, fully-invisible change; not worth gambling the build the night before you test. The product a tester *sees* is 100% Driftway regardless. Fully reversible — it's a staged, separate step. |
-| D3 | **Launcher icon** | New Driftway mark (electric-blue), replace the car+magnifier | Blocker for a believable rebrand. |
+| D1 | App **name** | **Driftway** (label, menu title, all UI strings) | Locked. |
+| D2 | **applicationId / package** | **FLIP to `com.driftway.browser`** (full clean rebrand) | Installs as a separate new app; owner will reinstall fresh. Done AFTER the open PRs merge (package move conflicts otherwise). |
+| D3 | **Launcher icon** | New Driftway mark (electric-blue), replace the car+magnifier | Vector foreground; keep #1565FF adaptive background. |
 | D4 | **Update checker** repo | Point at `CreatorGhost/Driftway` (was wrongly `kododake/AABrowser` upstream — a real bug) | Blocker fix; GitHub redirects old links. |
-| D5 | **Analytics** (Umami → original author's server) | **Remove** the network send (was opt-in/off-by-default) | Privacy + don't leak to the original creator's server. Reversible. |
-| D6 | **Donations/sponsor** (kododake Bitcoin + Sponsors + FUNDING.yml) | **Remove** from UI/links (donate card already gone); **keep** GPLv3 attribution to Kododake | GPLv3 requires keeping attribution; donations to the original owner are removed. |
-| D7 | **Repo** | Rename `CreatorGhost/AABrowser` → `CreatorGhost/Driftway` as the final step | Locked earlier; GitHub redirects old URLs + open PRs survive. |
+| D5 | **Analytics** (Umami → original author's server) | **Remove now**; repoint to OWNER's endpoint when provided | Owner chose "repoint to me" — he'll give the endpoint in the morning. Until then the network send is removed (no leak to the original creator). Leave a clear TODO + config seam. |
+| D6 | **Donations/sponsor** (kododake Bitcoin + Sponsors + FUNDING.yml) | **Remove now**; repoint to OWNER when provided | Owner will give his Bitcoin/sponsor details in the morning. Keep GPLv3 attribution to Kododake (legally required). |
+| D7 | **Repo + release** | **Rename** `CreatorGhost/AABrowser` → `CreatorGhost/Driftway` AND **publish** signed Release `v2.2-beta1` | Owner wants an installable build by morning. Old URLs redirect; open PRs survive. |
 | D8 | **Version** | `versionCode 12`, `versionName "2.2-beta1"`, release tag `v2.2-beta1` | Clean relaunch marker. |
+| D9 | **Photo / ambient mode** | **Remove the feature entirely** (button + photo-only mode + custom-background + its settings/prefs) | Owner found it confusing; home is always the cinematic Driftway hero. Button hidden in Stage 0; full removal in Stage 2. |
 
 ## Execution order (each stage build-verified; PRs wait for CodeRabbit)
 
 ```
-Stage 0  Home polish + blocker fixes on PR #7 (front-not-ugly + NPE guards)   [in progress]
+Stage 0  Home polish + blocker fixes on PR #7 (front-not-ugly + NPE guards)   [DONE ✅ 5634c9d]
 Stage 1  WAIT for CodeRabbit on #6, #7, #5 → fix findings → merge in order:
             #6 (theme) → #7 (home, stacked) → #5 (popup)  →  main
-Stage 2  REBRAND (visible): app_name/menu_title/settings strings/app_credit,
-            new launcher icon, update-checker → CreatorGhost/Driftway,
-            remove analytics + donations/sponsor + FUNDING.yml, keep GPLv3 attribution
+Stage 2  REBRAND: PACKAGE FLIP com.kododake.aabrowser → com.driftway.browser (dir move +
+            all refs + intent actions + tests + gradle ns/applicationId); app_name/menu_title/
+            settings strings/app_credit → Driftway; new launcher icon; update-checker →
+            CreatorGhost/Driftway; REMOVE analytics + donations/sponsor + FUNDING.yml
+            (leave owner-config TODO seams); REMOVE photo/ambient feature entirely;
+            keep GPLv3 attribution; versionCode 12 / versionName 2.2-beta1
 Stage 3  Control bar (Step 2): replace the 3-dots FAB with a hidden + swipe-up
             bottom bar (Back · Home · Tabs · Menu), fixed always-visible handle
-Stage 4  Pre-launch audit fixes (P0/P1): defer notification permission until first
-            playback; sparse-shelf balance; hide empty shelf labels; long-name/continue
-            caps; menu legibility (car-HMI); fix genuinely-broken light-theme surfaces
-            (keep the home hero intentionally cinematic-dark)
-Stage 5  Build SIGNED release APK (Driftway 2.2-beta1) + GitHub Release
-Stage 6  Rename repo → CreatorGhost/Driftway; verify update-checker resolves
+Stage 4  Pre-launch audit fixes: defer notification permission until first playback;
+            sparse-shelf balance; menu legibility (car-HMI ≥16sp); fix genuinely-broken
+            light-theme surfaces (keep the home hero intentionally cinematic-dark)
+Stage 5  Adversarial review workflow → fix → build SIGNED release APK (Driftway 2.2-beta1)
+Stage 6  ★ THOROUGH EMULATOR TEST (MANDATORY before release is announced) ★
+            - Video playback: open YouTube, press play, confirm it KEEPS playing (the
+              play-then-stop regression) for ≥30s; check audio continues in background.
+            - Pop-up / ad handling: visit an ad-heavy / sketchy site, confirm pop-ups &
+              pop-unders are blocked and no dialog spam; SponsorBlock if enabled.
+            - Navigation: address bar, search, back/forward, tabs (open/close/switch),
+              bookmarks, settings open + toggles, QR.
+            - Rebrand: launcher label = Driftway, new icon, no "AABrowser" in any UI,
+              update-check points at the new repo.
+            - Both orientations (portrait phone + landscape head unit).
+            Capture screenshots + a logcat scan for crashes/ANRs. Fix anything found,
+            rebuild, re-test until clean.
+Stage 7  Rename repo → CreatorGhost/Driftway; publish GitHub Release; verify update-checker
+            resolves the new release.
 --- stretch (if time) ---
-Stage 7  Motion layer (press springs + panel transitions)
-Stage 8  Read-Aloud TTS flagship
-Stage 9  Settings polish
+Stage 8  Motion layer · Stage 9  Read-Aloud TTS · Stage 10  Settings polish
 ```
 
 ## Workflows / automation used (in order)
