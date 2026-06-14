@@ -30,6 +30,9 @@
     <string name="menu_settings_description">Open settings</string>
     <string name="menu_tabs">Tabs</string>
     <string name="menu_new_tab">New Tab</string>
+    <string name="control_bar_show">Show controls</string>
+    <string name="control_bar_home">Home</string>
+    <string name="control_bar_menu">Menu</string>
     
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_bookmark_add">Bookmark current page</string>

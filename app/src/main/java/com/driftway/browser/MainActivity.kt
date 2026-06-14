@@ -1068,6 +1068,7 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.menu_tabs)
         }
         binding.buttonTabs.text = tabsLabel
+        if (::binding.isInitialized) binding.controlTabsLabel.text = tabsLabel
 
         val canAddMoreTabs = browserTabs.size < BrowserPreferences.MAX_OPEN_TABS
         binding.buttonNewTab.isEnabled = canAddMoreTabs
@@ -1394,6 +1395,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.persistentButtonMenu.setOnClickListener { showMenuOverlay() }
         binding.menuFab.setOnClickListener { handleQuickActionButtonPressed() }
+        setupBottomControlBar()
         binding.buttonClose.setOnClickListener { hideMenuOverlay() }
         binding.menuOverlayScrim.setOnClickListener { hideMenuOverlay() }
         applyMenuHeaderColors()
@@ -1562,13 +1564,11 @@ class MainActivity : AppCompatActivity() {
         layoutParams.setMargins(margin, topOffset, margin, margin)
         binding.menuFab.layoutParams = layoutParams
 
-        if (isShowingStartPage || BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
-            handler.removeCallbacks(showMenuFabRunnable)
-            handler.removeCallbacks(autoHideMenuFab)
-            if (!isInFullscreen() && !binding.menuOverlay.isVisible) {
-                binding.menuFab.show()
-            }
-        }
+        // FAB retired in favor of the always-visible swipe-up control bar — keep it hidden
+        // regardless of the legacy quick-action-button prefs.
+        handler.removeCallbacks(showMenuFabRunnable)
+        handler.removeCallbacks(autoHideMenuFab)
+        binding.menuFab.hide()
     }
 
     private fun focusMenuAddressBar() {
@@ -1816,15 +1816,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMenuButtonTemporarily() {
+        // Retired: the 3-dots FAB is replaced by the always-visible swipe-up control bar.
+        // Keep the FAB hidden and cancel any pending show so it never appears.
         handler.removeCallbacks(showMenuFabRunnable)
         handler.removeCallbacks(autoHideMenuFab)
-        if (isInFullscreen() || binding.menuOverlay.isVisible) return
-        if (isShowingStartPage || BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
-            binding.menuFab.show()
-            return
-        }
-        handler.postDelayed(showMenuFabRunnable, MENU_BUTTON_SHOW_DELAY_MS)
+        if (::binding.isInitialized) binding.menuFab.hide()
     }
+
+    private fun setupBottomControlBar() {
+        binding.controlBack.setOnClickListener { hideControlBar(); onBackPressedDispatcher.onBackPressed() }
+        binding.controlHome.setOnClickListener { hideControlBar(); hideMenuOverlay(); showStartPage() }
+        binding.controlTabs.setOnClickListener { hideControlBar(); showTabManager() }
+        binding.controlMenu.setOnClickListener { hideControlBar(); showMenuOverlay() }
+        binding.bottomControlHandle.setOnClickListener { toggleControlBar() }
+        // Swipe up on the handle reveals the bar; swipe down hides it. Taps fall through to the
+        // click listener above (the detector only consumes flings).
+        val detector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (velocityY < -600f) { showControlBar(); return true }
+                if (velocityY > 600f) { hideControlBar(); return true }
+                return false
+            }
+        })
+        binding.bottomControlHandle.setOnTouchListener { _, ev -> detector.onTouchEvent(ev) }
+    }
+
+    private fun toggleControlBar() {
+        if (binding.bottomControlBar.isVisible) hideControlBar() else showControlBar()
+    }
+
+    private fun showControlBar() {
+        if (!::binding.isInitialized) return
+        val bar = binding.bottomControlBar
+        if (bar.isVisible) return
+        bar.visibility = View.VISIBLE
+        bar.alpha = 0f
+        bar.post {
+            val dy = (bar.height.takeIf { it > 0 } ?: dpToPx(96)).toFloat()
+            bar.translationY = dy
+            bar.animate().translationY(0f).alpha(1f).setDuration(220L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        }
+    }
+
+    private fun hideControlBar() {
+        if (!::binding.isInitialized) return
+        val bar = binding.bottomControlBar
+        if (!bar.isVisible) return
+        val dy = (bar.height.takeIf { it > 0 } ?: dpToPx(96)).toFloat()
+        bar.animate().translationY(dy).alpha(0f).setDuration(160L)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                bar.visibility = View.GONE
+                bar.translationY = 0f
+                bar.alpha = 1f
+            }.start()
+    }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
     private fun openUriExternally(uri: Uri) {
         runCatching {

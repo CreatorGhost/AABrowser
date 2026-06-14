@@ -1529,16 +1529,144 @@
         </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
+    <!-- Legacy menu FAB retired; replaced by the swipe-up control bar below. Kept hidden so the
+         existing show/hide call-sites stay harmless. -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/menuFab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_margin="16dp"
+        android:visibility="gone"
         android:contentDescription="@string/menu_open_description"
         app:srcCompat="@drawable/more_vert_24px"
         app:tint="?attr/colorOnPrimary"
         app:backgroundTint="?attr/colorPrimary"
         app:elevation="6dp" />
+
+    <!-- Swipe-up control bar: a fixed, always-visible handle reveals Back/Home/Tabs/Menu. -->
+    <LinearLayout
+        android:id="@+id/bottomControlContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/bottomControlBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="12dp"
+            app:cardBackgroundColor="#0C1017"
+            app:strokeWidth="1dp"
+            app:strokeColor="#2A3142">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="6dp">
+
+                <LinearLayout
+                    android:id="@+id/controlBack"
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp"
+                        android:src="@drawable/arrow_back_24px" android:tint="#F2F5FB"
+                        android:contentDescription="@null" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="@string/menu_back"
+                        android:textColor="#C9D2E3" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/controlHome"
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp"
+                        android:src="@drawable/home_24px" android:tint="#F2F5FB"
+                        android:contentDescription="@null" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="@string/control_bar_home"
+                        android:textColor="#C9D2E3" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/controlTabs"
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp"
+                        android:src="@drawable/tab_group_24px" android:tint="#F2F5FB"
+                        android:contentDescription="@null" />
+                    <TextView android:id="@+id/controlTabsLabel"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="@string/menu_tabs"
+                        android:textColor="#C9D2E3" android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/controlMenu"
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp"
+                        android:src="@drawable/more_vert_24px" android:tint="#F2F5FB"
+                        android:contentDescription="@null" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:text="@string/control_bar_menu"
+                        android:textColor="#C9D2E3" android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <FrameLayout
+            android:id="@+id/bottomControlHandle"
+            android:layout_width="116dp"
+            android:layout_height="34dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/control_handle_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="@string/control_bar_show">
+            <View
+                android:layout_width="44dp"
+                android:layout_height="5dp"
+                android:layout_gravity="center"
+                android:background="@drawable/control_handle_grip" />
+        </FrameLayout>
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
