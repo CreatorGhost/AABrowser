@@ -339,9 +339,21 @@ class MainActivity : AppCompatActivity() {
         return if (index >= 0) index else 0
     }
 
+    // The app is permanently dark (MODE_NIGHT_YES), but Activity.getTheme() can still resolve the
+    // day palette for colors looked up in code — producing white cards and unreadable headers
+    // while XML-inflated views correctly use values-night. Resolve against a context explicitly
+    // configured for night so every code-built color matches the rest of the dark UI.
+    private val darkThemedContext: Context by lazy {
+        val nightConfig = android.content.res.Configuration(resources.configuration).apply {
+            uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        createConfigurationContext(nightConfig).apply { setTheme(R.style.Theme_AABrowser) }
+    }
+
     private fun resolveThemeColor(attrRes: Int): Int {
         val typedValue = TypedValue()
-        theme.resolveAttribute(attrRes, typedValue, true)
+        darkThemedContext.theme.resolveAttribute(attrRes, typedValue, true)
         return typedValue.data
     }
     
