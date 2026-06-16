@@ -1257,6 +1257,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showTabManager() {
+        // When opened from the control bar the menu overlay is still closed, so just toggling the
+        // inner panel left tabManagerRoot "visible" inside a GONE parent — the tab list never
+        // appeared. Bring the overlay sheet in first (no-op when already open, e.g. from the menu).
+        if (!binding.menuOverlay.isVisible) {
+            showMenuOverlay()
+        }
         binding.menuScroll.visibility = View.GONE
         binding.bookmarkManagerRoot.visibility = View.GONE
         binding.qrCodeViewRoot.visibility = View.GONE
